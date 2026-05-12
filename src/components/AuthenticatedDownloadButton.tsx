@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '../contexts/AuthContext'
 import { analytics } from '../lib/analytics'
 import {
   DOWNLOAD_FEEDBACK_EVENT,
@@ -61,8 +59,6 @@ export default function AuthenticatedDownloadButton({
   analyticsLocation,
   onBeforeNavigate,
 }: AuthenticatedDownloadButtonProps) {
-  const { user, loading } = useAuth()
-  const router = useRouter()
   const [downloadFeedbackExpiresAt, setDownloadFeedbackExpiresAt] = useState<number | null>(null)
   const isPreparingDownload = downloadFeedbackExpiresAt !== null
 
@@ -96,7 +92,7 @@ export default function AuthenticatedDownloadButton({
   }, [downloadFeedbackExpiresAt, location])
 
   const handleClick = () => {
-    if (loading || isPreparingDownload) return
+    if (isPreparingDownload) return
 
     const referrer = document.referrer || 'Direct visit'
 
@@ -105,24 +101,14 @@ export default function AuthenticatedDownloadButton({
     }
 
     onBeforeNavigate?.()
-
-    if (user) {
-      startDownload(location, referrer)
-      return
-    }
-
-    sessionStorage.setItem('clipa:pendingDownloadLocation', location)
-    sessionStorage.setItem('clipa:pendingDownloadReferrer', referrer)
-
-    const params = new URLSearchParams({ from: 'download', location, referrer })
-    router.push(`/login?${params.toString()}`)
+    void startDownload(location, referrer)
   }
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={loading || isPreparingDownload}
+      disabled={isPreparingDownload}
       className={`${className} ${isPreparingDownload ? 'btn-download-pending' : ''}`}
       aria-label={isPreparingDownload ? 'Preparing Clipa Studio download' : 'Download Clipa Studio for Mac'}
       aria-busy={isPreparingDownload}

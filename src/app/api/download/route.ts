@@ -1,9 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient, type User } from '@supabase/supabase-js'
 import { DOWNLOAD_SOURCE_URL } from '../../../lib/download'
 
 export const runtime = 'nodejs'
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || process.env.NEXT_PUBLIC_SLACK_WEBHOOK_URL || ''
+
+let authClient: ReturnType<typeof createClient> | null = null
+
+const getAuthClient = () => {
+  if (authClient) return authClient
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase auth environment variables')
+  }
+
+  authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+
+  return authClient
+}
+
+const getBearerToken = (request: NextRequest) => {
+  const authorization = request.headers.get('authorization')
+  if (!authorization?.startsWith('Bearer ')) return null
+  return authorization.slice('Bearer '.length).trim() || null
+}
+
+const getFormString = (formData: FormData | null, key: string) => {
+  const value = formData?.get(key)
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+const getRequestFormData = async (request: NextRequest) => {
+  if (request.method !== 'POST') return null
+
+  const contentType = request.headers.get('content-type') || ''
+  if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+    return null
+  }
+
+  return request.formData()
+}
+
+const getDownloadRequest = async (request: NextRequest) => {
+  const formData = await getRequestFormData(request)
+
+  return {
+    token: getBearerToken(request) || getFormString(formData, 'access_token'),
+    location: getFormString(formData, 'location') || request.nextUrl.searchParams.get('location') || 'unknown',
+    referrer:
+      getFormString(formData, 'referrer') ||
+      request.nextUrl.searchParams.get('referrer') ||
+      request.headers.get('referer') ||
+      'Direct visit',
+  }
+}
+
+const getAuthenticatedUser = async (token: string | null) => {
+  if (!token) return null
+
+  const { data, error } = await getAuthClient().auth.getUser(token)
+  if (error || !data.user) return null
+
+  return data.user
+}
 
 const getClientIp = (request: NextRequest) => {
   const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -59,19 +127,24 @@ const getLocationInfo = async (request: NextRequest, ip: string) => {
   }
 }
 
-const notifyDownloadSuccess = async (request: NextRequest, location: string) => {
+const formatUserInfo = (user: User | null) => {
+  if (!user) return 'guest'
+  return user.email ? `${user.email} (${user.id})` : user.id
+}
+
+const notifyDownloadSuccess = async (request: NextRequest, location: string, referrer: string, user: User | null) => {
   if (!SLACK_WEBHOOK_URL) return
 
-  const referrer = request.nextUrl.searchParams.get('referrer') || request.headers.get('referer') || 'Direct visit'
   const ip = getClientIp(request)
   const locationInfo = await getLocationInfo(request, ip)
+  const userAgent = request.headers.get('user-agent') || '알 수 없음'
 
   try {
     await fetch(SLACK_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: `<!channel>\n🔔 딩동! 다운로드 성공 알림이에요~ 🔔\n\n(${location}에서 왔어요)\n📍 ${locationInfo}\n🔗 유입: ${referrer}`,
+        text: `<!channel>\n🔔 딩동! 다운로드 성공 알림이에요~ 🔔\n\n(${location}에서 왔어요)\n📍 ${locationInfo}\n🔗 유입: ${referrer}\n👤 사용자: ${formatUserInfo(user)}\n🧭 UA: ${userAgent}`,
       }),
     })
   } catch (error) {
@@ -79,8 +152,9 @@ const notifyDownloadSuccess = async (request: NextRequest, location: string) => 
   }
 }
 
-export async function GET(request: NextRequest) {
-  const location = request.nextUrl.searchParams.get('location') || 'unknown'
+const handleDownload = async (request: NextRequest) => {
+  const { token, location, referrer } = await getDownloadRequest(request)
+  const user = await getAuthenticatedUser(token)
 
   const downloadResponse = await fetch(DOWNLOAD_SOURCE_URL, {
     redirect: 'follow',
@@ -94,7 +168,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  await notifyDownloadSuccess(request, location)
+  await notifyDownloadSuccess(request, location, referrer, user)
 
   const headers = new Headers()
   const passthroughHeaders = [
@@ -115,4 +189,12 @@ export async function GET(request: NextRequest) {
     status: downloadResponse.status,
     headers,
   })
+}
+
+export async function GET(request: NextRequest) {
+  return handleDownload(request)
+}
+
+export async function POST(request: NextRequest) {
+  return handleDownload(request)
 }
