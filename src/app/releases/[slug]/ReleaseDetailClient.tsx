@@ -185,7 +185,7 @@ export default function ReleaseDetailClient({ initialRelease, slug }: ReleaseDet
               </button>
             )}
             <Link
-              href={`/admin/releases/${release.slug}/edit`}
+              href={`/admin/changelog/${release.slug}/edit`}
               className="btn-block-ghost btn-block-sm"
             >
               Edit

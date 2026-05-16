@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter, useParams } from 'next/navigation'
+import { usePathname, useRouter, useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Header from '../../../../components/Header'
 import { useAuth } from '../../../../contexts/AuthContext'
@@ -25,12 +25,17 @@ function isUuid(value: string): boolean {
 
 export default function BlogEditClient() {
   const router = useRouter()
+  const pathname = usePathname()
   const params = useParams()
   const slug = typeof params.slug === 'string' ? params.slug : null
   const id = typeof params.id === 'string' ? params.id : null
   const postKey = slug ?? id
   const { user } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
+  const isAdminRoute = pathname.startsWith('/admin')
+  const pageClass = isAdminRoute
+    ? 'max-w-5xl mx-auto pb-10'
+    : 'max-w-5xl mx-auto pt-28 pb-16 px-4'
 
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loadingPost, setLoadingPost] = useState(true)
@@ -147,8 +152,8 @@ export default function BlogEditClient() {
   if (adminLoading || loadingPost) {
     return (
       <>
-        <Header />
-        <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
+        {!isAdminRoute && <Header />}
+        <div className={pageClass}>
           <p className="text-gray-500">Loading...</p>
         </div>
       </>
@@ -158,9 +163,9 @@ export default function BlogEditClient() {
   if (!isAdmin) {
     return (
       <>
-        <Header />
-        <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access denied</h1>
+        {!isAdminRoute && <Header />}
+        <div className={pageClass}>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Access denied</h1>
           <p className="text-gray-500 mb-6">You do not have permission to edit blog posts.</p>
           <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
             Back to Blog
@@ -173,9 +178,9 @@ export default function BlogEditClient() {
   if (!post) {
     return (
       <>
-        <Header />
-        <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Post not found</h1>
+        {!isAdminRoute && <Header />}
+        <div className={pageClass}>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Post not found</h1>
           <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
             Back to Blog
           </Link>
@@ -209,7 +214,11 @@ export default function BlogEditClient() {
         published,
         published_at: publishedAt,
       })
-      router.push(published ? getBlogPostHref(updatedPost) : `/admin/blog/${updatedPost.id}/edit`)
+      router.push(
+        published
+          ? (isAdminRoute ? '/admin/blog' : getBlogPostHref(updatedPost))
+          : `/admin/blog/${updatedPost.id}/edit`,
+      )
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to update post')
     } finally {
@@ -217,14 +226,21 @@ export default function BlogEditClient() {
     }
   }
 
-  const inputClass =
-    'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none transition-colors'
+  const inputClass = isAdminRoute
+    ? 'w-full rounded-lg border border-white/10 bg-[#0C0C14] px-4 py-3 text-white placeholder-white/30 outline-none transition-colors focus:border-white/30'
+    : 'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none transition-colors'
+  const labelClass = isAdminRoute
+    ? 'block text-sm font-medium text-white/45 mb-1'
+    : 'block text-sm font-medium text-gray-500 mb-1'
+  const actionClass = isAdminRoute
+    ? 'rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-[#0C0C14] transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50'
+    : 'bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold rounded-xl px-6 py-3 shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed'
 
   return (
     <>
-      <Header />
-      <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Edit Blog Post</h1>
+      {!isAdminRoute && <Header />}
+      <div className={pageClass}>
+        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>Edit Blog Post</h1>
 
         {error && (
           <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-400 text-sm">
@@ -234,7 +250,7 @@ export default function BlogEditClient() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-500 mb-1">
+            <label htmlFor="title" className={labelClass}>
               Title
             </label>
             <input
@@ -249,7 +265,7 @@ export default function BlogEditClient() {
           </div>
 
           <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-500 mb-1">
+            <label htmlFor="category" className={labelClass}>
               Category
             </label>
             <select
@@ -268,7 +284,7 @@ export default function BlogEditClient() {
           </div>
 
           <div>
-            <label htmlFor="excerpt" className="block text-sm font-medium text-gray-500 mb-1">
+            <label htmlFor="excerpt" className={labelClass}>
               Excerpt
             </label>
             <textarea
@@ -281,8 +297,8 @@ export default function BlogEditClient() {
             />
           </div>
 
-          <div data-color-mode="light">
-            <label htmlFor="content" className="block text-sm font-medium text-gray-500 mb-1">
+          <div data-color-mode={isAdminRoute ? 'dark' : 'light'}>
+            <label htmlFor="content" className={labelClass}>
               Content
             </label>
             <div
@@ -303,7 +319,7 @@ export default function BlogEditClient() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">
+            <label className={labelClass}>
               Cover Image
             </label>
             {(coverPreview || coverImageUrl) && (
@@ -311,7 +327,7 @@ export default function BlogEditClient() {
                 <img
                   src={coverPreview || coverImageUrl}
                   alt="Cover preview"
-                  className="w-full max-h-48 object-cover rounded-xl border border-gray-200"
+                  className={isAdminRoute ? 'w-full max-h-48 object-cover rounded-lg border border-white/10' : 'w-full max-h-48 object-cover rounded-xl border border-gray-200'}
                 />
                 {uploading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
@@ -328,7 +344,11 @@ export default function BlogEditClient() {
               </div>
             )}
             <label
-              className={`flex items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-gray-300 px-4 py-6 text-gray-500 hover:border-primary-500 hover:text-primary-400 transition-colors cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+              className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
+                isAdminRoute
+                  ? 'border-white/10 text-white/45 hover:border-white/25 hover:text-white/70'
+                  : 'border-gray-300 text-gray-500 hover:border-primary-500 hover:text-primary-400'
+              } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -349,9 +369,9 @@ export default function BlogEditClient() {
               type="checkbox"
               checked={published}
               onChange={(e) => setPublished(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 bg-white text-primary-500 focus:ring-primary-500"
+              className={isAdminRoute ? 'h-4 w-4 rounded border-white/20 bg-[#0C0C14] text-primary-500 focus:ring-primary-500' : 'h-4 w-4 rounded border-gray-300 bg-white text-primary-500 focus:ring-primary-500'}
             />
-            <label htmlFor="published" className="text-sm font-medium text-gray-500">
+            <label htmlFor="published" className={isAdminRoute ? 'text-sm font-medium text-white/55' : 'text-sm font-medium text-gray-500'}>
               Published
             </label>
           </div>
@@ -360,13 +380,13 @@ export default function BlogEditClient() {
             <button
               type="submit"
               disabled={submitting}
-              className="bg-gradient-to-r from-primary-500 to-primary-600 text-white font-semibold rounded-xl px-6 py-3 shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className={actionClass}
             >
               {submitting ? 'Saving...' : 'Save Changes'}
             </button>
             <Link
-              href={post.published ? getBlogPostHref({ ...post, category_slug: categorySlug }) : '/blog/overview'}
-              className="text-gray-500 hover:text-gray-900 font-medium transition-colors"
+              href={isAdminRoute ? '/admin/blog' : (post.published ? getBlogPostHref({ ...post, category_slug: categorySlug }) : '/blog/overview')}
+              className={isAdminRoute ? 'text-white/50 hover:text-white font-medium transition-colors' : 'text-gray-500 hover:text-gray-900 font-medium transition-colors'}
             >
               Cancel
             </Link>

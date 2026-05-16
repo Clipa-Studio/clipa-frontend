@@ -1,144 +1,151 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '../../contexts/AuthContext'
-import { useAdmin } from '../../hooks/useAdmin'
+import { useEffect, useState } from 'react'
+import {
+  adminFetch,
+  type AdminDashboardData,
+} from './_components/adminApi'
+import {
+  AdminButton,
+  ErrorState,
+  LoadingState,
+  PageHeader,
+  Panel,
+  StatusPill,
+  formatDateTime,
+} from './_components/AdminPrimitives'
 
-const adminSections = [
-  {
-    title: 'Blog',
-    description: 'Create posts, continue drafts, and manage published articles.',
-    primaryLabel: 'New post',
-    primaryHref: '/admin/blog/new',
-    secondaryLabel: 'View blog',
-    secondaryHref: '/blog/overview',
-  },
-  {
-    title: 'Releases',
-    description: 'Write release notes and publish product changelog updates.',
-    primaryLabel: 'New release',
-    primaryHref: '/admin/releases/new',
-    secondaryLabel: 'View changelog',
-    secondaryHref: '/releases',
-  },
-]
+function deltaLabel(current: number, previous: number) {
+  const diff = current - previous
+  if (diff === 0) return 'No change'
+  return `${diff > 0 ? '+' : ''}${diff} vs yesterday`
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string
+  value: number | string
+  detail?: string
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-4">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-white/35">{label}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{value}</p>
+      {detail && <p className="mt-2 text-sm text-white/45">{detail}</p>}
+    </div>
+  )
+}
 
 export default function AdminDashboardClient() {
-  const router = useRouter()
-  const { user, loading: authLoading, signInWithGoogle, signInWithGithub, signOut } = useAuth()
-  const { isAdmin, loading: adminLoading } = useAdmin()
-  const loading = authLoading || adminLoading
+  const [data, setData] = useState<AdminDashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSignOut = async () => {
-    await signOut()
-    router.replace('/admin')
-  }
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        setLoading(true)
+        setError(null)
+        const dashboard = await adminFetch<AdminDashboardData>('dashboard')
+        if (!cancelled) setData(dashboard)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load dashboard')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) return <LoadingState label="Loading dashboard..." />
+  if (error) return <ErrorState message={error} />
+  if (!data) return null
+
+  const { metrics } = data
 
   return (
-    <main className="min-h-screen bg-[#0C0C14] text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8">
-        <header className="flex items-center justify-between border-b border-white/10 pb-6">
-          <Link href="/admin" className="flex items-center gap-3">
-            <img src="/images/logo.png" alt="Clipa" className="h-8 w-8" />
-            <div>
-              <p className="text-lg font-semibold leading-tight">Clipa Admin</p>
-              <p className="text-xs text-white/45">admin.clipa.studio/admin</p>
-            </div>
-          </Link>
+    <>
+      <PageHeader
+        title="Dashboard"
+        description="A concise view of users, subscriptions, product events, and content work in progress."
+        action={<AdminButton href="/admin/events" variant="secondary">View events</AdminButton>}
+      />
 
-          {user && (
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-white/65 transition-colors hover:border-white/20 hover:text-white"
-            >
-              Sign out
-            </button>
-          )}
-        </header>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total users" value={metrics.totalUsers} detail={deltaLabel(metrics.usersToday, metrics.usersYesterday)} />
+        <MetricCard label="Click events today" value={metrics.clickEventsToday} detail={deltaLabel(metrics.clickEventsToday, metrics.clickEventsYesterday)} />
+        <MetricCard label="Active subscriptions" value={metrics.activeSubscriptions} detail={`${metrics.activeDevices} active devices`} />
+        <MetricCard label="Draft content" value={metrics.draftPosts + metrics.draftReleases} detail={`${metrics.draftPosts} posts, ${metrics.draftReleases} changelogs`} />
+      </div>
 
-        <section className="flex flex-1 flex-col justify-center py-14">
-          {loading ? (
-            <div className="flex items-center gap-3 text-white/55">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-primary-300" />
-              <span className="text-sm">Checking access...</span>
-            </div>
-          ) : !user ? (
-            <div className="max-w-md">
-              <h1 className="text-3xl font-bold tracking-tight">Admin sign in</h1>
-              <p className="mt-3 text-sm leading-6 text-white/55">
-                Use an account with the admin role to manage Clipa content.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => signInWithGoogle('admin')}
-                  className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#0C0C14] transition-colors hover:bg-white/90"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  onClick={() => signInWithGithub('admin')}
-                  className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:border-white/20 hover:text-white"
-                >
-                  Continue with GitHub
-                </button>
+      <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Panel title="Latest release">
+          {data.latestRelease ? (
+            <div className="p-4">
+              <div className="flex items-center gap-3">
+                <StatusPill tone="green">Published</StatusPill>
+                <span className="text-sm text-white/45">{formatDateTime(data.latestRelease.published_at)}</span>
               </div>
-            </div>
-          ) : !isAdmin ? (
-            <div className="max-w-md">
-              <h1 className="text-3xl font-bold tracking-tight">Access denied</h1>
-              <p className="mt-3 text-sm leading-6 text-white/55">
-                {user.email} is signed in, but this account does not have the admin role.
-              </p>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="mt-8 rounded-lg border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:border-white/20 hover:text-white"
+              <Link
+                href={`/admin/changelog/${data.latestRelease.slug}/edit`}
+                className="mt-4 block text-xl font-semibold text-white transition-colors hover:text-primary-200"
               >
-                Sign out
-              </button>
+                v{data.latestRelease.version} · {data.latestRelease.title}
+              </Link>
             </div>
           ) : (
-            <>
-              <div className="mb-8">
-                <p className="text-sm font-medium text-primary-200">Signed in as {user.email}</p>
-                <h1 className="mt-2 text-3xl font-bold tracking-tight">Admin dashboard</h1>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {adminSections.map((section) => (
-                  <section
-                    key={section.title}
-                    className="rounded-lg border border-white/10 bg-white/[0.03] p-5"
-                  >
-                    <h2 className="text-xl font-semibold">{section.title}</h2>
-                    <p className="mt-2 min-h-[48px] text-sm leading-6 text-white/55">
-                      {section.description}
-                    </p>
-                    <div className="mt-6 flex flex-wrap gap-3">
-                      <Link
-                        href={section.primaryHref}
-                        className="rounded-lg bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-400"
-                      >
-                        {section.primaryLabel}
-                      </Link>
-                      <Link
-                        href={section.secondaryHref}
-                        className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:border-white/20 hover:text-white"
-                      >
-                        {section.secondaryLabel}
-                      </Link>
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </>
+            <p className="p-4 text-sm text-white/45">No published release yet.</p>
           )}
-        </section>
+        </Panel>
+
+        <Panel title="Recent users">
+          <div className="divide-y divide-white/10">
+            {data.recentUsers.map((profile) => (
+              <div key={profile.id} className="px-4 py-3">
+                <p className="truncate text-sm font-medium text-white/80">
+                  {profile.email || profile.auth_email || profile.id}
+                </p>
+                <p className="mt-1 text-xs text-white/40">{formatDateTime(profile.created_at)}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
       </div>
-    </main>
+
+      <Panel title="Recent click and product events" action={<AdminButton href="/admin/events" variant="secondary">Open list</AdminButton>}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-[0.08em] text-white/35">
+              <tr>
+                <th className="px-4 py-3 font-medium">Event</th>
+                <th className="px-4 py-3 font-medium">Environment</th>
+                <th className="px-4 py-3 font-medium">App</th>
+                <th className="px-4 py-3 font-medium">Received</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {data.recentEvents.map((event) => (
+                <tr key={event.event_id}>
+                  <td className="px-4 py-3 text-white/80">{event.event_name}</td>
+                  <td className="px-4 py-3"><StatusPill>{event.environment || 'unknown'}</StatusPill></td>
+                  <td className="px-4 py-3 text-white/50">{event.app_version || '-'} {event.app_build ? `(${event.app_build})` : ''}</td>
+                  <td className="px-4 py-3 text-white/45">{formatDateTime(event.received_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </>
   )
 }

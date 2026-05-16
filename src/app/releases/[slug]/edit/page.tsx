@@ -6,5 +6,5 @@ export default async function EditReleasePage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  redirect(`/admin/releases/${slug}/edit`)
+  redirect(`/admin/changelog/${slug}/edit`)
 }
