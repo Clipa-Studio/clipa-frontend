@@ -1,5 +1,34 @@
 // GA4 이벤트 추적 헬퍼
 
+type SlackAnalyticsEvent =
+  | { type: "contact_email_click" }
+  | { type: "purchase_complete"; planName: string }
+  | {
+      type: "subscription_cancel";
+      email: string;
+      reason: string;
+      detail?: string;
+    };
+
+// 슬랙 알림은 서버 API route에서만 webhook을 사용한다.
+const sendSlackNotification = async (event: SlackAnalyticsEvent) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    await fetch("/api/slack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...event,
+        referrer: document.referrer || "Direct visit",
+      }),
+      keepalive: true,
+    });
+  } catch (error) {
+    console.error("Slack notification failed:", error);
+  }
+};
+
 declare global {
   interface Window {
     gtag: (
@@ -33,11 +62,13 @@ export const analytics = {
   // 문의 이메일 클릭
   contactEmailClick: () => {
     trackEvent("contact_email_click", "engagement", "faq_section");
+    sendSlackNotification({ type: "contact_email_click" });
   },
 
   // 결제 성공
   purchaseComplete: (planName: string) => {
     trackEvent("purchase_complete", "conversion", planName);
+    sendSlackNotification({ type: "purchase_complete", planName });
   },
 
   // 랜딩페이지 방문
@@ -66,8 +97,12 @@ export const analytics = {
     reason: string,
     detail?: string
   ) => {
-    void email;
-    void detail;
     trackEvent("subscription_cancel", "churn", reason);
+    await sendSlackNotification({
+      type: "subscription_cancel",
+      email,
+      reason,
+      detail,
+    });
   },
 };
