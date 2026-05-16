@@ -28,6 +28,8 @@ export function useDevice(): UseDeviceReturn {
   const userId = user?.id
 
   const fetch = useCallback(async () => {
+    await Promise.resolve()
+
     if (!userId) {
       setDevice(null)
       setLoading(false)
@@ -62,7 +64,13 @@ export function useDevice(): UseDeviceReturn {
   }, [userId])
 
   useEffect(() => {
-    fetch()
+    const timeoutId = window.setTimeout(() => {
+      fetch()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [fetch])
 
   const deactivateDevice = useCallback(async (): Promise<boolean> => {

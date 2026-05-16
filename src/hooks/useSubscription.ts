@@ -21,6 +21,8 @@ export function useSubscription(): UseSubscriptionReturn {
   const userId = user?.id
 
   const fetch = useCallback(async () => {
+    await Promise.resolve()
+
     if (!userId) {
       setSubscription(null)
       setLoading(false)
@@ -42,7 +44,13 @@ export function useSubscription(): UseSubscriptionReturn {
   }, [userId])
 
   useEffect(() => {
-    fetch()
+    const timeoutId = window.setTimeout(() => {
+      fetch()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
   }, [fetch])
 
 

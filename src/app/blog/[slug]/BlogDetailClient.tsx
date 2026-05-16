@@ -15,41 +15,45 @@ import type { BlogPost } from '../../../lib/blog'
 interface BlogDetailClientProps {
   initialPost: BlogPost | null
   slug: string
+  backHref?: string
+  backLabel?: string
 }
 
-export default function BlogDetailClient({ initialPost, slug }: BlogDetailClientProps) {
+export default function BlogDetailClient({
+  initialPost,
+  slug,
+  backHref = '/blog/overview',
+  backLabel = 'Back to Blog',
+}: BlogDetailClientProps) {
   const router = useRouter()
   const { isAdmin, loading: adminLoading } = useAdmin()
-  const [post, setPost] = useState<BlogPost | null>(initialPost)
-  const [loadingPost, setLoadingPost] = useState(!initialPost)
+  const [draftPost, setDraftPost] = useState<BlogPost | null>(null)
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const post = initialPost ?? draftPost
+  const loadingPost = !initialPost && (adminLoading || (isAdmin && !draftLoaded))
 
   useEffect(() => {
-    if (initialPost) {
-      setPost(initialPost)
-      setLoadingPost(false)
-      return
-    }
+    if (initialPost || adminLoading || !isAdmin) return
 
-    if (adminLoading) return
-    if (!isAdmin) {
-      setLoadingPost(false)
-      return
-    }
+    let cancelled = false
 
     async function fetchDraftPost() {
-      setLoadingPost(true)
       try {
         const data = await getPostBySlug(slug)
-        setPost(data)
+        if (!cancelled) setDraftPost(data)
       } catch (error) {
         console.error('Failed to load draft post:', error)
-        setPost(null)
+        if (!cancelled) setDraftPost(null)
       } finally {
-        setLoadingPost(false)
+        if (!cancelled) setDraftLoaded(true)
       }
     }
 
     fetchDraftPost()
+
+    return () => {
+      cancelled = true
+    }
   }, [adminLoading, initialPost, isAdmin, slug])
 
   const handleDelete = async () => {
@@ -60,7 +64,7 @@ export default function BlogDetailClient({ initialPost, slug }: BlogDetailClient
 
     try {
       await deletePost(post.id)
-      router.push('/blog')
+      router.push(backHref)
     } catch (error) {
       console.error('Failed to delete post:', error)
       alert('Failed to delete the post.')
@@ -85,10 +89,10 @@ export default function BlogDetailClient({ initialPost, slug }: BlogDetailClient
         <Header />
         <main className="relative z-10 max-w-3xl mx-auto pt-28 pb-20 px-4 flex-grow w-full">
           <Link
-            href="/blog"
+            href={backHref}
             className="inline-flex items-center gap-1 text-white/50 hover:text-primary-400 font-medium mb-10 transition-colors"
           >
-            &larr; Back to Blog
+            &larr; {backLabel}
           </Link>
           <h1 className="text-3xl font-bold text-white mb-4">Post not found</h1>
           <p className="text-white/50">This post is not available.</p>
@@ -107,10 +111,10 @@ export default function BlogDetailClient({ initialPost, slug }: BlogDetailClient
       </div>
       <main className="relative z-10 max-w-3xl mx-auto pt-28 pb-20 px-4 flex-grow w-full">
         <Link
-          href="/blog"
+          href={backHref}
           className="inline-flex items-center gap-1 text-white/50 hover:text-primary-400 font-medium mb-10 transition-colors"
         >
-          &larr; Back to Blog
+          &larr; {backLabel}
         </Link>
 
         <div className="flex items-center gap-3 mb-6">
@@ -155,7 +159,7 @@ export default function BlogDetailClient({ initialPost, slug }: BlogDetailClient
         {isAdmin && (
           <div className="flex items-center gap-4 mt-16 pt-8 border-t border-white/10">
             <Link
-              href={`/blog/${post.slug}/edit`}
+              href={`/admin/blog/${post.id}/edit`}
               className="btn-block-ghost btn-block-sm"
             >
               Edit

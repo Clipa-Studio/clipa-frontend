@@ -105,25 +105,26 @@ export default function UpgradeModal({
 
   // Preview 호출 (모달 열릴 때)
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen) return
+
+    let cancelled = false
+
+    async function loadPreview() {
+      await Promise.resolve()
+      if (cancelled) return
+
       setUpgradePreview(null)
       setDowngradePreview(null)
       setLifetimePreview(null)
       setError(null)
-      return
-    }
+      setLoading(true)
 
-    let cancelled = false
-    setLoading(true)
-    setError(null)
+      const body = isLifetime
+        ? { action: 'preview_lifetime', price_id: PRICE_IDS.lifetime }
+        : { action: 'preview', price_id: priceId, target_interval: interval }
 
-    const body = isLifetime
-      ? { action: 'preview_lifetime', price_id: PRICE_IDS.lifetime }
-      : { action: 'preview', price_id: priceId, target_interval: interval }
-
-    supabase.functions
-      .invoke('upgrade-subscription', { body })
-      .then(({ data, error: err }) => {
+      try {
+        const { data, error: err } = await supabase.functions.invoke('upgrade-subscription', { body })
         if (cancelled) return
         console.log('[UpgradeModal] preview response:', { data, error: err })
         if (err || !data) {
@@ -141,13 +142,14 @@ export default function UpgradeModal({
         } else {
           setUpgradePreview(parseUpgradePreview(data))
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setError('Failed to load details.')
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    loadPreview()
 
     return () => {
       cancelled = true

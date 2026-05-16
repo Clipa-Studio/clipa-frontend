@@ -8,11 +8,26 @@ export interface BlogPost {
   excerpt: string | null;
   content: string;
   cover_image_url: string | null;
+  category_slug?: string | null;
   published: boolean;
   published_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+const RESERVED_BLOG_SLUGS = new Set([
+  'new',
+  'manage',
+  'admin',
+  'api',
+  'overview',
+  'capture',
+  'edit',
+  'export',
+  'compare',
+  'use-cases',
+  'troubleshooting',
+]);
 
 export function generateSlug(title: string): string {
   const base = title
@@ -20,9 +35,51 @@ export function generateSlug(title: string): string {
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-  const timestamp = Date.now();
-  return `${base}-${timestamp}`;
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'post';
+
+  return RESERVED_BLOG_SLUGS.has(base) ? `${base}-article` : base;
+}
+
+export async function generateUniqueSlug(
+  title: string,
+  excludePostId?: string,
+): Promise<string> {
+  const baseSlug = generateSlug(title);
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('id, slug');
+
+  if (error) throw error;
+
+  const usedSlugs = new Set(
+    (data ?? [])
+      .filter((post) => post.id !== excludePostId)
+      .map((post) => post.slug),
+  );
+
+  if (!usedSlugs.has(baseSlug)) return baseSlug;
+
+  let suffix = 2;
+  while (usedSlugs.has(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseSlug}-${suffix}`;
+}
+
+export async function getPostById(id: string): Promise<BlogPost | null> {
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return data as BlogPost;
 }
 
 export async function getPublishedPosts(): Promise<BlogPost[]> {

@@ -7,6 +7,13 @@ import Footer from '../../components/Footer'
 import { useAdmin } from '../../hooks/useAdmin'
 import { getAllPosts } from '../../lib/blog'
 import type { BlogPost } from '../../lib/blog'
+import {
+  BLOG_CATEGORIES,
+  getBlogCategory,
+  getBlogPostHref,
+  getPostsForBlogCategory,
+  type BlogCategorySlug,
+} from '../../lib/blogCategories'
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -17,7 +24,7 @@ function formatDate(dateString: string): string {
 }
 
 function getPostHref(post: BlogPost): string {
-  return `/blog/${post.slug}`
+  return getBlogPostHref(post)
 }
 
 function HeroCard({ post }: { post: BlogPost }) {
@@ -104,25 +111,24 @@ function PostCard({ post }: { post: BlogPost }) {
 
 interface BlogListClientProps {
   initialPosts: BlogPost[]
+  categorySlug?: BlogCategorySlug
 }
 
-export default function BlogListClient({ initialPosts }: BlogListClientProps) {
+export default function BlogListClient({ initialPosts, categorySlug }: BlogListClientProps) {
   const { isAdmin } = useAdmin()
-  const [posts, setPosts] = useState<BlogPost[]>(initialPosts)
+  const [adminPosts, setAdminPosts] = useState<BlogPost[] | null>(null)
   const [loading, setLoading] = useState(false)
+  const category = categorySlug ? getBlogCategory(categorySlug) : null
 
   useEffect(() => {
-    if (!isAdmin) {
-      setPosts(initialPosts)
-      setLoading(false)
-      return
-    }
+    if (!isAdmin) return
 
     async function fetchPosts() {
+      await Promise.resolve()
       setLoading(true)
       try {
         const data = await getAllPosts()
-        setPosts(data)
+        setAdminPosts(data)
       } catch (err) {
         console.error('Failed to fetch posts:', err)
       } finally {
@@ -130,10 +136,12 @@ export default function BlogListClient({ initialPosts }: BlogListClientProps) {
       }
     }
     fetchPosts()
-  }, [initialPosts, isAdmin])
+  }, [isAdmin])
 
-  const heroPost = posts[0]
-  const restPosts = posts.slice(1)
+  const posts = isAdmin && adminPosts ? adminPosts : initialPosts
+  const visiblePosts = categorySlug ? getPostsForBlogCategory(posts, categorySlug) : posts
+  const heroPost = visiblePosts[0]
+  const restPosts = visiblePosts.slice(1)
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0C0C14]">
@@ -146,11 +154,34 @@ export default function BlogListClient({ initialPosts }: BlogListClientProps) {
       <main className="relative z-10 section-glow max-w-5xl mx-auto pt-28 pb-16 px-4 flex-grow w-full">
         <div className="text-center mb-14">
           <h1 className="heading-lg font-bold text-white mb-4 animate-on-load delay-1">
-            News, tips, and <span className="gradient-text">stories</span>
+            {category ? (
+              <>
+                {category.label} <span className="gradient-text">articles</span>
+              </>
+            ) : (
+              <>
+                News, tips, and <span className="gradient-text">stories</span>
+              </>
+            )}
           </h1>
           <p className="text-base sm:text-lg text-white/50 max-w-lg mx-auto animate-on-load delay-2">
-            From the Clipa team.
+            {category?.description ?? 'From the Clipa team.'}
           </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-2 animate-on-load delay-3">
+            {BLOG_CATEGORIES.map((item) => (
+              <Link
+                key={item.slug}
+                href={`/blog/${item.slug}`}
+                className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                  item.slug === categorySlug
+                    ? 'border-primary-400/50 bg-primary-400/10 text-primary-200'
+                    : 'border-white/10 bg-white/[0.03] text-white/55 hover:border-white/20 hover:text-white'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
           {isAdmin && (
             <Link
               href="/blog/new"
@@ -166,7 +197,7 @@ export default function BlogListClient({ initialPosts }: BlogListClientProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto mb-4" />
             <p className="text-white/50 text-sm">Loading posts...</p>
           </div>
-        ) : posts.length === 0 ? (
+        ) : visiblePosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 animate-on-load">
             <svg className="w-12 h-12 text-gray-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />

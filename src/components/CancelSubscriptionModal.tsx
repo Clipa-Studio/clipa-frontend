@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 
 interface CancelSubscriptionModalProps {
@@ -28,15 +28,6 @@ export default function CancelSubscriptionModal({
   const [step, setStep] = useState<'reason' | 'confirm'>('reason')
   const [loading, setLoading] = useState(false)
 
-  // 모달이 닫힐 때 상태 초기화
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedReason(null)
-      setOtherDetail('')
-      setStep('reason')
-    }
-  }, [isOpen])
-
   if (!isOpen) return null
 
   const handleReasonSelect = (reasonId: string) => {
@@ -55,6 +46,9 @@ export default function CancelSubscriptionModal({
     try {
       const reason = CANCEL_REASONS.find(r => r.id === selectedReason)?.label || selectedReason
       await onConfirm(reason, selectedReason === 'other' ? otherDetail : undefined)
+      setSelectedReason(null)
+      setOtherDetail('')
+      setStep('reason')
     } finally {
       setLoading(false)
     }

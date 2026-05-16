@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next'
+import { BLOG_CATEGORIES, getBlogPostHref } from '../lib/blogCategories'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +15,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: 'https://www.clipa.studio/pricing',
       changeFrequency: 'monthly',
       priority: 0.8,
-    },
-    {
-      url: 'https://www.clipa.studio/blog',
-      changeFrequency: 'weekly',
-      priority: 0.7,
     },
     {
       url: 'https://www.clipa.studio/releases',
@@ -42,13 +38,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ]
 
+  const blogCategoryPages: MetadataRoute.Sitemap = BLOG_CATEGORIES.map((category) => ({
+    url: `https://www.clipa.studio/blog/${category.slug}`,
+    changeFrequency: 'weekly',
+    priority: category.slug === 'overview' ? 0.7 : 0.6,
+  }))
+
   try {
     const { supabase } = await import('../lib/supabase')
 
     const [{ data: posts }, { data: releases }] = await Promise.all([
       supabase
         .from('blog_posts')
-        .select('slug, updated_at')
+        .select('slug, category_slug, updated_at')
         .eq('published', true)
         .order('published_at', { ascending: false }),
       supabase
@@ -59,7 +61,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ])
 
     const blogPages: MetadataRoute.Sitemap = (posts ?? []).map((post) => ({
-      url: `https://www.clipa.studio/blog/${post.slug}`,
+      url: `https://www.clipa.studio${getBlogPostHref(post)}`,
       lastModified: new Date(post.updated_at),
       changeFrequency: 'monthly',
       priority: 0.6,
@@ -72,8 +74,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     }))
 
-    return [...staticPages, ...blogPages, ...releasePages]
+    return [...staticPages, ...blogCategoryPages, ...blogPages, ...releasePages]
   } catch {
-    return staticPages
+    return [...staticPages, ...blogCategoryPages]
   }
 }

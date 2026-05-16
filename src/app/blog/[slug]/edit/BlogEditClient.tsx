@@ -7,8 +7,14 @@ import dynamic from 'next/dynamic'
 import Header from '../../../../components/Header'
 import { useAuth } from '../../../../contexts/AuthContext'
 import { useAdmin } from '../../../../hooks/useAdmin'
-import { updatePost, getPostBySlug } from '../../../../lib/blog'
+import { updatePost, getPostBySlug, getPostById } from '../../../../lib/blog'
 import type { BlogPost } from '../../../../lib/blog'
+import {
+  BLOG_CATEGORIES,
+  getBlogPostHref,
+  isBlogCategorySlug,
+  type BlogCategorySlug,
+} from '../../../../lib/blogCategories'
 import { uploadBlogImage, uploadBlogVideo } from '../../../../lib/storage'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -16,7 +22,8 @@ const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 export default function BlogEditClient() {
   const router = useRouter()
   const params = useParams()
-  const slug = params.slug as string
+  const slug = typeof params.slug === 'string' ? params.slug : null
+  const id = typeof params.id === 'string' ? params.id : null
   const { user } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
 
@@ -27,6 +34,7 @@ export default function BlogEditClient() {
   const [content, setContent] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [coverPreview, setCoverPreview] = useState('')
+  const [categorySlug, setCategorySlug] = useState<BlogCategorySlug>('overview')
   const [published, setPublished] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadingMedia, setUploadingMedia] = useState(false)
@@ -98,11 +106,11 @@ export default function BlogEditClient() {
   }
 
   useEffect(() => {
-    if (!slug) return
+    if (!slug && !id) return
 
     async function fetchPost() {
       try {
-        const data = await getPostBySlug(slug)
+        const data = id ? await getPostById(id) : await getPostBySlug(slug!)
         if (!data) {
           setError('Post not found')
           setLoadingPost(false)
@@ -113,6 +121,11 @@ export default function BlogEditClient() {
         setExcerpt(data.excerpt || '')
         setContent(data.content)
         setCoverImageUrl(data.cover_image_url || '')
+        setCategorySlug(
+          data.category_slug && isBlogCategorySlug(data.category_slug)
+            ? data.category_slug
+            : 'overview',
+        )
         setPublished(data.published)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load post')
@@ -122,7 +135,7 @@ export default function BlogEditClient() {
     }
 
     fetchPost()
-  }, [slug])
+  }, [id, slug])
 
   if (adminLoading || loadingPost) {
     return (
@@ -142,7 +155,7 @@ export default function BlogEditClient() {
         <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access denied</h1>
           <p className="text-gray-500 mb-6">You do not have permission to edit blog posts.</p>
-          <Link href="/blog" className="text-primary-400 hover:text-primary-300 font-medium">
+          <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
             Back to Blog
           </Link>
         </div>
@@ -156,7 +169,7 @@ export default function BlogEditClient() {
         <Header />
         <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Post not found</h1>
-          <Link href="/blog" className="text-primary-400 hover:text-primary-300 font-medium">
+          <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
             Back to Blog
           </Link>
         </div>
@@ -180,15 +193,16 @@ export default function BlogEditClient() {
         publishedAt = new Date().toISOString()
       }
 
-      await updatePost(post.id, {
+      const updatedPost = await updatePost(post.id, {
         title,
         excerpt: excerpt || null,
         content,
         cover_image_url: coverImageUrl || null,
+        category_slug: categorySlug,
         published,
         published_at: publishedAt,
       })
-      router.push(published ? `/blog/${slug}` : `/blog/${slug}/edit`)
+      router.push(published ? getBlogPostHref(updatedPost) : `/admin/blog/${updatedPost.id}/edit`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to update post')
     } finally {
@@ -225,6 +239,25 @@ export default function BlogEditClient() {
               className={inputClass}
               placeholder="Post title"
             />
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-500 mb-1">
+              Category
+            </label>
+            <select
+              id="category"
+              required
+              value={categorySlug}
+              onChange={(e) => setCategorySlug(e.target.value as BlogCategorySlug)}
+              className={inputClass}
+            >
+              {BLOG_CATEGORIES.map((category) => (
+                <option key={category.slug} value={category.slug}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -324,7 +357,10 @@ export default function BlogEditClient() {
             >
               {submitting ? 'Saving...' : 'Save Changes'}
             </button>
-            <Link href={post.published ? `/blog/${slug}` : '/blog'} className="text-gray-500 hover:text-gray-900 font-medium transition-colors">
+            <Link
+              href={post.published ? getBlogPostHref({ ...post, category_slug: categorySlug }) : '/blog/overview'}
+              className="text-gray-500 hover:text-gray-900 font-medium transition-colors"
+            >
               Cancel
             </Link>
           </div>

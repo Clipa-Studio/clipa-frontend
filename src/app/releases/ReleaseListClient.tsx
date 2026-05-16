@@ -131,21 +131,18 @@ interface ReleaseListClientProps {
 
 export default function ReleaseListClient({ initialReleases }: ReleaseListClientProps) {
   const { isAdmin } = useAdmin()
-  const [releases, setReleases] = useState<Release[]>(initialReleases)
+  const [adminReleases, setAdminReleases] = useState<Release[] | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!isAdmin) {
-      setReleases(initialReleases)
-      setLoading(false)
-      return
-    }
+    if (!isAdmin) return
 
     async function fetchReleases() {
+      await Promise.resolve()
       setLoading(true)
       try {
         const data = await getAllReleases()
-        setReleases(data)
+        setAdminReleases(data)
       } catch (err) {
         console.error('Failed to fetch releases:', err)
       } finally {
@@ -153,8 +150,9 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
       }
     }
     fetchReleases()
-  }, [initialReleases, isAdmin])
+  }, [isAdmin])
 
+  const releases = isAdmin && adminReleases ? adminReleases : initialReleases
   const latestRelease = releases[0]
   const previousReleases = releases.slice(1)
 

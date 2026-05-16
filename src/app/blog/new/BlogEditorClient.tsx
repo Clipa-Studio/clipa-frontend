@@ -7,7 +7,12 @@ import dynamic from 'next/dynamic'
 import Header from '../../../components/Header'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useAdmin } from '../../../hooks/useAdmin'
-import { createPost, generateSlug } from '../../../lib/blog'
+import { createPost, generateUniqueSlug } from '../../../lib/blog'
+import {
+  BLOG_CATEGORIES,
+  getBlogPostHref,
+  type BlogCategorySlug,
+} from '../../../lib/blogCategories'
 import { uploadBlogImage, uploadBlogVideo } from '../../../lib/storage'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -22,6 +27,7 @@ export default function BlogEditorClient() {
   const [content, setContent] = useState('')
   const [coverImageUrl, setCoverImageUrl] = useState('')
   const [coverPreview, setCoverPreview] = useState('')
+  const [categorySlug, setCategorySlug] = useState<BlogCategorySlug>('overview')
   const [published, setPublished] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadingMedia, setUploadingMedia] = useState(false)
@@ -110,7 +116,7 @@ export default function BlogEditorClient() {
         <div className="max-w-5xl mx-auto pt-28 pb-16 px-4">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access denied</h1>
           <p className="text-gray-500 mb-6">You do not have permission to create blog posts.</p>
-          <Link href="/blog" className="text-primary-400 hover:text-primary-300 font-medium">
+          <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
             Back to Blog
           </Link>
         </div>
@@ -126,18 +132,19 @@ export default function BlogEditorClient() {
     setError(null)
 
     try {
-      const slug = generateSlug(title)
+      const slug = await generateUniqueSlug(title)
       const post = await createPost({
         title,
         slug,
         excerpt: excerpt || null,
         content,
         cover_image_url: coverImageUrl || null,
+        category_slug: categorySlug,
         published,
         published_at: published ? new Date().toISOString() : null,
         author_id: user.id,
       })
-      router.push(post.published ? `/blog/${post.slug}` : `/blog/${post.slug}/edit`)
+      router.push(post.published ? getBlogPostHref(post) : `/admin/blog/${post.id}/edit`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create post')
     } finally {
@@ -174,6 +181,25 @@ export default function BlogEditorClient() {
               className={inputClass}
               placeholder="Post title"
             />
+          </div>
+
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-500 mb-1">
+              Category
+            </label>
+            <select
+              id="category"
+              required
+              value={categorySlug}
+              onChange={(e) => setCategorySlug(e.target.value as BlogCategorySlug)}
+              className={inputClass}
+            >
+              {BLOG_CATEGORIES.map((category) => (
+                <option key={category.slug} value={category.slug}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -273,7 +299,7 @@ export default function BlogEditorClient() {
             >
               {submitting ? 'Creating...' : 'Create Post'}
             </button>
-            <Link href="/blog" className="text-gray-500 hover:text-gray-900 font-medium transition-colors">
+            <Link href="/blog/overview" className="text-gray-500 hover:text-gray-900 font-medium transition-colors">
               Cancel
             </Link>
           </div>

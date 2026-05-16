@@ -122,14 +122,28 @@ export default function PricingClient() {
 
   // 로그인 후 pending checkout 자동 실행
   useEffect(() => {
-    if (user && pendingPriceId) {
-      openCheckout({
+    if (!user || !pendingPriceId) return
+
+    let cancelled = false
+
+    async function continuePendingCheckout() {
+      await Promise.resolve()
+      if (cancelled || !user || !pendingPriceId) return
+
+      await openCheckout({
         priceId: pendingPriceId,
         userEmail: user.email,
         userId: user.id,
       })
+      if (cancelled) return
       setPendingPriceId(null)
       setLoading(null)
+    }
+
+    continuePendingCheckout()
+
+    return () => {
+      cancelled = true
     }
   }, [user, pendingPriceId])
 

@@ -42,6 +42,7 @@ export default function MyPageClient() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [reactivateLoading, setReactivateLoading] = useState(false)
+  const [currentTime] = useState(() => Date.now())
 
   const openManageSubscription = async () => {
     setPortalLoading(true)
@@ -338,11 +339,10 @@ export default function MyPageClient() {
                 {!lifetime && (() => {
                   const start = new Date(subscription.subscription_period_start).getTime()
                   const end = new Date(subscription.subscription_period_end).getTime()
-                  const now = Date.now()
                   const total = end - start
-                  const elapsed = Math.min(now - start, total)
+                  const elapsed = Math.min(currentTime - start, total)
                   const progress = Math.round((elapsed / total) * 100)
-                  const daysLeft = Math.max(0, Math.ceil((end - now) / (1000 * 60 * 60 * 24)))
+                  const daysLeft = Math.max(0, Math.ceil((end - currentTime) / (1000 * 60 * 60 * 24)))
 
                   return (
                     <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">

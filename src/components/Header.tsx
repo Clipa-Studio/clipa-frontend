@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type FocusEvent } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { analytics } from "../lib/analytics";
 import { useAuth } from "../contexts/AuthContext";
 import AuthenticatedDownloadButton from "./AuthenticatedDownloadButton";
+import { BLOG_CATEGORIES } from "../lib/blogCategories";
 
 export default function Header() {
   const { user, loading, signOut } = useAuth();
@@ -13,14 +14,53 @@ export default function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileBlogOpen, setMobileBlogOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [blogMenuOpen, setBlogMenuOpen] = useState(false);
+  const blogCloseTimer = useRef<number | null>(null);
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '';
+
+  const clearBlogCloseTimer = () => {
+    if (blogCloseTimer.current) {
+      window.clearTimeout(blogCloseTimer.current);
+      blogCloseTimer.current = null;
+    }
+  };
+
+  const openBlogMenu = () => {
+    clearBlogCloseTimer();
+    setBlogMenuOpen(true);
+  };
+
+  const closeBlogMenu = () => {
+    clearBlogCloseTimer();
+    setBlogMenuOpen(false);
+  };
+
+  const scheduleBlogMenuClose = () => {
+    clearBlogCloseTimer();
+    blogCloseTimer.current = window.setTimeout(() => {
+      setBlogMenuOpen(false);
+      blogCloseTimer.current = null;
+    }, 120);
+  };
 
   const handleLogout = async () => {
     setDropdownOpen(false);
     await signOut();
     router.push('/');
+  };
+
+  const closeBlogMenus = () => {
+    closeBlogMenu();
+    setMobileBlogOpen(false);
+  };
+
+  const handleBlogBlur = (event: FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      closeBlogMenu();
+    }
   };
 
   useEffect(() => {
@@ -40,9 +80,11 @@ export default function Header() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [dropdownOpen]);
 
+  useEffect(() => {
+    return () => clearBlogCloseTimer();
+  }, []);
+
   const navLinks = [
-    { name: "Pricing", href: "/pricing" },
-    { name: "Blog", href: "/blog" },
     { name: "Changelog", href: "/releases" },
   ];
 
@@ -57,6 +99,8 @@ export default function Header() {
       </a>
       {/* Navbar */}
       <header
+        onMouseLeave={closeBlogMenu}
+        onBlur={handleBlogBlur}
         className={`sticky top-0 z-50 w-full transition-all duration-300 ${
           scrolled ? "bg-[#0C0C14]/90 backdrop-blur-xl border-b border-white/[0.08] shadow-lg shadow-black/20" : "bg-transparent border-b border-transparent"
         }`}
@@ -66,6 +110,7 @@ export default function Header() {
             {/* Logo */}
             <a
               href="/"
+              onMouseEnter={closeBlogMenus}
               onClick={(e) => {
                 e.preventDefault();
                 if (pathname === "/") {
@@ -86,11 +131,41 @@ export default function Header() {
 
             {/* Desktop Nav */}
             <nav className="hidden lg:flex items-center gap-8 text-[16px] font-medium text-gray-300">
+              <Link
+                href="/pricing"
+                onMouseEnter={closeBlogMenus}
+                onClick={() => {
+                  closeBlogMenus();
+                  analytics.navClick('Pricing');
+                }}
+                className="hover:-translate-y-0.5 transition-all duration-200 cursor-pointer hover:text-white"
+              >
+                Pricing
+              </Link>
+              <div
+                className="relative"
+                onMouseEnter={openBlogMenu}
+                onMouseLeave={scheduleBlogMenuClose}
+                onFocus={openBlogMenu}
+              >
+                <Link
+                  href="/blog/overview"
+                  onClick={() => analytics.navClick('Blog')}
+                  className="hover:-translate-y-0.5 transition-all duration-200 cursor-pointer hover:text-white"
+                  aria-expanded={blogMenuOpen}
+                >
+                  Blog
+                </Link>
+              </div>
               {navLinks.map((link) => (
                   <Link
                     key={link.name}
                     href={link.href}
-                    onClick={() => analytics.navClick(link.name)}
+                    onMouseEnter={closeBlogMenus}
+                    onClick={() => {
+                      closeBlogMenus();
+                      analytics.navClick(link.name);
+                    }}
                     className="hover:-translate-y-0.5 transition-all duration-200 cursor-pointer hover:text-white"
                   >
                     {link.name}
@@ -176,23 +251,120 @@ export default function Header() {
           </button>
         </div>
 
+        <div
+          className={`absolute left-0 right-0 top-16 hidden overflow-hidden border-b border-white/[0.08] bg-[#0C0C14]/90 shadow-2xl shadow-black/30 backdrop-blur-xl transition-[max-height,opacity,transform] duration-300 ease-out lg:block ${
+            blogMenuOpen
+              ? 'max-h-[520px] translate-y-0 opacity-100 pointer-events-auto'
+              : 'max-h-0 -translate-y-3 opacity-0 pointer-events-none'
+          }`}
+          onMouseEnter={openBlogMenu}
+          onMouseLeave={scheduleBlogMenuClose}
+        >
+          <div
+            className={`transition-transform duration-300 ease-out ${
+              blogMenuOpen ? 'translate-y-0' : '-translate-y-4'
+            }`}
+          >
+            <div className="mx-auto grid max-w-7xl grid-cols-[260px_minmax(0,1fr)] gap-14 px-6 py-10">
+              <div className="border-r border-white/10 pr-10">
+                <p className="text-sm font-medium text-primary-300/80">Blog</p>
+                <Link
+                  href="/blog/overview"
+                  onClick={() => {
+                    setBlogMenuOpen(false);
+                    analytics.navClick('Blog Overview');
+                  }}
+                  className="mt-3 inline-flex text-xl font-semibold text-white transition-colors hover:text-primary-200"
+                >
+                  Browse articles
+                </Link>
+                <p className="mt-3 max-w-[210px] text-sm leading-relaxed text-white/50">
+                  Articles organized by workflow, comparison, use case, and troubleshooting.
+                </p>
+              </div>
+              <div className="grid max-w-4xl grid-cols-2 gap-x-5 gap-y-2">
+                {BLOG_CATEGORIES.map((category) => (
+                  <Link
+                    key={category.slug}
+                    href={`/blog/${category.slug}`}
+                    onClick={() => {
+                      setBlogMenuOpen(false);
+                      analytics.navClick(`Blog ${category.label}`);
+                    }}
+                    className="group block rounded-xl border border-transparent px-4 py-3 transition-colors hover:border-white/10 hover:bg-white/[0.04]"
+                  >
+                    <span className="block text-[17px] font-semibold leading-tight text-white transition-colors group-hover:text-primary-200">
+                      {category.label}
+                    </span>
+                    <span className="mt-1 block max-w-[340px] text-sm leading-relaxed text-white/55 group-hover:text-white/70">
+                      {category.description}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Mobile Menu */}
         <div className={`lg:hidden border-b overflow-hidden transition-all duration-200 ease-out bg-[#0C0C14] ${
           mobileMenuOpen
-            ? 'max-h-[400px] opacity-100 border-white/[0.08]'
+            ? 'max-h-[720px] opacity-100 border-white/[0.08]'
             : 'max-h-0 opacity-0 border-transparent'
         }`}>
             <div className="px-6 py-4 flex flex-col gap-4">
-              {navLinks.map((link) => (
-                  <Link
-                    key={link.name}
-                    href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-lg font-medium py-2 border-b text-gray-200 border-white/[0.08]"
-                  >
-                    {link.name}
-                  </Link>
-              ))}
+              <Link
+                href="/pricing"
+                onClick={() => {
+                  closeBlogMenus();
+                  setMobileMenuOpen(false);
+                }}
+                className="text-lg font-medium py-2 border-b text-gray-200 border-white/[0.08]"
+              >
+                Pricing
+              </Link>
+              <div className="border-b border-white/[0.08] pb-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileBlogOpen(!mobileBlogOpen)}
+                  className="flex w-full items-center justify-between py-2 text-left text-lg font-medium text-gray-200"
+                  aria-expanded={mobileBlogOpen}
+                >
+                  Blog
+                  <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${mobileBlogOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className={`grid overflow-hidden transition-all duration-200 ${mobileBlogOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                  <div className="min-h-0">
+                    <div className="grid gap-1 pb-1 pt-2">
+                      {BLOG_CATEGORIES.map((category) => (
+                        <Link
+                          key={category.slug}
+                          href={`/blog/${category.slug}`}
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            setMobileBlogOpen(false);
+                          }}
+                          className="rounded-lg px-3 py-2 text-base text-white/60 hover:bg-white/5 hover:text-white"
+                        >
+                          {category.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Link
+                href="/releases"
+                onClick={() => {
+                  closeBlogMenus();
+                  setMobileMenuOpen(false);
+                }}
+                className="text-lg font-medium py-2 border-b text-gray-200 border-white/[0.08]"
+              >
+                Changelog
+              </Link>
               {user ? (
                 <>
                   <Link
