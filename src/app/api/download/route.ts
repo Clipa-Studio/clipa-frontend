@@ -4,7 +4,7 @@ import { DOWNLOAD_SOURCE_URL } from '../../../lib/download'
 
 export const runtime = 'nodejs'
 
-const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || process.env.NEXT_PUBLIC_SLACK_WEBHOOK_URL || ''
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || ''
 
 let authClient: ReturnType<typeof createClient> | null = null
 
