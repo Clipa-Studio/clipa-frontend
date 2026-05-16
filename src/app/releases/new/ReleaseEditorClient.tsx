@@ -67,7 +67,7 @@ export default function ReleaseEditorClient() {
         published_at: published ? new Date().toISOString() : null,
         author_id: user.id,
       })
-      router.push(`/releases/${release.slug}`)
+      router.push(release.published ? `/releases/${release.slug}` : `/admin/releases/${release.slug}/edit`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create release')
     } finally {

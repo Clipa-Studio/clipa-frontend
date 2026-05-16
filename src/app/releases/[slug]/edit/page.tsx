@@ -1,5 +1,10 @@
-import ReleaseEditClient from './ReleaseEditClient'
+import { redirect } from 'next/navigation'
 
-export default function EditReleasePage() {
-  return <ReleaseEditClient />
+export default async function EditReleasePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  redirect(`/admin/releases/${slug}/edit`)
 }

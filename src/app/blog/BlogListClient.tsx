@@ -220,7 +220,7 @@ export default function BlogListClient({ initialPosts, categorySlug }: BlogListC
           </div>
           {isAdmin && (
             <Link
-              href="/blog/new"
+              href="/admin/blog/new"
               className="btn-block btn-block-sm mt-6 animate-on-load delay-3"
             >
               New Post

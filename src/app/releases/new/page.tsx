@@ -1,5 +1,5 @@
-import ReleaseEditorClient from './ReleaseEditorClient'
+import { redirect } from 'next/navigation'
 
 export default function NewReleasePage() {
-  return <ReleaseEditorClient />
+  redirect('/admin/releases/new')
 }

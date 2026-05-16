@@ -19,11 +19,16 @@ import { uploadBlogImage, uploadBlogVideo } from '../../../../lib/storage'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
 export default function BlogEditClient() {
   const router = useRouter()
   const params = useParams()
   const slug = typeof params.slug === 'string' ? params.slug : null
   const id = typeof params.id === 'string' ? params.id : null
+  const postKey = slug ?? id
   const { user } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
 
@@ -106,11 +111,13 @@ export default function BlogEditClient() {
   }
 
   useEffect(() => {
-    if (!slug && !id) return
+    if (!postKey) return
 
     async function fetchPost() {
       try {
-        const data = id ? await getPostById(id) : await getPostBySlug(slug!)
+        const data = postKey && isUuid(postKey)
+          ? await getPostById(postKey)
+          : await getPostBySlug(postKey!)
         if (!data) {
           setError('Post not found')
           setLoadingPost(false)
@@ -135,7 +142,7 @@ export default function BlogEditClient() {
     }
 
     fetchPost()
-  }, [id, slug])
+  }, [postKey])
 
   if (adminLoading || loadingPost) {
     return (

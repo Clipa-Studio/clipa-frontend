@@ -1,5 +1,5 @@
-import BlogEditorClient from './BlogEditorClient'
+import { redirect } from 'next/navigation'
 
 export default function NewBlogPage() {
-  return <BlogEditorClient />
+  redirect('/admin/blog/new')
 }

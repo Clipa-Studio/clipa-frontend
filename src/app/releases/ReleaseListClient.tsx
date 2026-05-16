@@ -69,7 +69,7 @@ function LatestRelease({ release, isAdmin }: { release: Release; isAdmin: boolea
         </Link>
         {isAdmin && (
           <Link
-            href={`/releases/${release.slug}/edit`}
+            href={`/admin/releases/${release.slug}/edit`}
             className="text-sm text-white/40 hover:text-primary-400 transition-colors"
           >
             Edit
@@ -107,7 +107,7 @@ function ReleaseListItem({ release, isAdmin }: { release: Release; isAdmin: bool
       <div className="flex shrink-0 items-center gap-4">
         {isAdmin && (
           <Link
-            href={`/releases/${release.slug}/edit`}
+            href={`/admin/releases/${release.slug}/edit`}
             className="text-xs text-white/40 hover:text-primary-400 transition-colors"
           >
             Edit
@@ -174,7 +174,7 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
           </p>
           {isAdmin && (
             <Link
-              href="/releases/new"
+              href="/admin/releases/new"
               className="btn-block btn-block-sm mt-6 animate-on-load delay-3"
             >
               New Release

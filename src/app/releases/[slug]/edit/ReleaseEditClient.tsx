@@ -116,7 +116,7 @@ export default function ReleaseEditClient() {
         published,
         published_at: publishedAt,
       })
-      router.push(`/releases/${slug}`)
+      router.push(published ? `/releases/${slug}` : `/admin/releases/${slug}/edit`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to update release')
     } finally {
