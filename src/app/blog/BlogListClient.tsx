@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
 import { useAdmin } from '../../hooks/useAdmin'
@@ -115,8 +116,10 @@ interface BlogListClientProps {
 }
 
 export default function BlogListClient({ initialPosts, categorySlug }: BlogListClientProps) {
+  const pathname = usePathname()
   const { isAdmin } = useAdmin()
   const [adminPosts, setAdminPosts] = useState<BlogPost[] | null>(null)
+  const [pendingCategorySlug, setPendingCategorySlug] = useState<BlogCategorySlug | null>(null)
   const [loading, setLoading] = useState(false)
   const category = categorySlug ? getBlogCategory(categorySlug) : null
 
@@ -138,8 +141,19 @@ export default function BlogListClient({ initialPosts, categorySlug }: BlogListC
     fetchPosts()
   }, [isAdmin])
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setPendingCategorySlug(null)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [pathname])
+
   const posts = isAdmin && adminPosts ? adminPosts : initialPosts
   const visiblePosts = categorySlug ? getPostsForBlogCategory(posts, categorySlug) : posts
+  const showContentLoading = loading && visiblePosts.length === 0
   const heroPost = visiblePosts[0]
   const restPosts = visiblePosts.slice(1)
 
@@ -152,7 +166,15 @@ export default function BlogListClient({ initialPosts, categorySlug }: BlogListC
         <div className="absolute bottom-[30%] left-[8%] w-48 h-48 rounded-2xl bg-gradient-to-br from-purple-500/[0.07] to-purple-600/[0.03] rotate-[-8deg] blur-sm" />
       </div>
       <main className="relative z-10 section-glow max-w-5xl mx-auto pt-28 pb-16 px-4 flex-grow w-full">
-        <div className="text-center mb-14">
+        <div
+          className="relative text-center mb-14"
+          aria-busy={pendingCategorySlug !== null}
+        >
+          {pendingCategorySlug && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-3xl bg-[#0C0C14]/45 backdrop-blur-[2px]">
+              <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/25 border-t-primary-300" />
+            </div>
+          )}
           <h1 className="heading-lg font-bold text-white mb-4 animate-on-load delay-1">
             {category ? (
               <>
@@ -172,6 +194,20 @@ export default function BlogListClient({ initialPosts, categorySlug }: BlogListC
               <Link
                 key={item.slug}
                 href={`/blog/${item.slug}`}
+                onClick={(event) => {
+                  if (
+                    item.slug === categorySlug ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey ||
+                    event.button !== 0
+                  ) {
+                    return
+                  }
+
+                  setPendingCategorySlug(item.slug)
+                }}
                 className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
                   item.slug === categorySlug
                     ? 'border-primary-400/50 bg-primary-400/10 text-primary-200'
@@ -192,7 +228,7 @@ export default function BlogListClient({ initialPosts, categorySlug }: BlogListC
           )}
         </div>
 
-        {loading ? (
+        {showContentLoading ? (
           <div className="flex flex-col items-center justify-center py-20 animate-on-load">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto mb-4" />
             <p className="text-white/50 text-sm">Loading posts...</p>
