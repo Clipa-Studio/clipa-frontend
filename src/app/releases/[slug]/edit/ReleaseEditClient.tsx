@@ -40,7 +40,7 @@ export default function ReleaseEditClient() {
       try {
         const data = await getReleaseBySlug(slug)
         if (!data) {
-          setError('Release not found')
+          setError('ChangeLog를 찾을 수 없습니다.')
           setLoadingRelease(false)
           return
         }
@@ -50,7 +50,7 @@ export default function ReleaseEditClient() {
         setContent(data.content)
         setPublished(data.published)
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to load release')
+        setError(err instanceof Error ? err.message : 'ChangeLog를 불러오지 못했습니다.')
       } finally {
         setLoadingRelease(false)
       }
@@ -64,7 +64,7 @@ export default function ReleaseEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">불러오는 중...</p>
         </div>
       </>
     )
@@ -75,10 +75,10 @@ export default function ReleaseEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Access denied</h1>
-          <p className="text-gray-500 mb-6">You do not have permission to edit releases.</p>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>접근 권한 없음</h1>
+          <p className="text-gray-500 mb-6">ChangeLog를 수정할 권한이 없습니다.</p>
           <Link href="/releases" className="text-primary-400 hover:text-primary-300 font-medium">
-            Back to Releases
+            ChangeLog로 돌아가기
           </Link>
         </div>
       </>
@@ -90,9 +90,9 @@ export default function ReleaseEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Release not found</h1>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>ChangeLog를 찾을 수 없습니다.</h1>
           <Link href="/releases" className="text-primary-400 hover:text-primary-300 font-medium">
-            Back to Releases
+            ChangeLog로 돌아가기
           </Link>
         </div>
       </>
@@ -127,7 +127,7 @@ export default function ReleaseEditClient() {
           : `/admin/changelog/${slug}/edit`,
       )
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update release')
+      setError(err instanceof Error ? err.message : 'ChangeLog를 저장하지 못했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -147,7 +147,7 @@ export default function ReleaseEditClient() {
     <>
       {!isAdminRoute && <Header />}
       <div className={pageClass}>
-        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>Edit Release</h1>
+        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>ChangeLog 수정</h1>
 
         {error && (
           <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-400 text-sm">
@@ -159,7 +159,7 @@ export default function ReleaseEditClient() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="version" className={labelClass}>
-                Version
+	                버전
               </label>
               <input
                 id="version"
@@ -173,7 +173,7 @@ export default function ReleaseEditClient() {
             </div>
             <div>
               <label htmlFor="title" className={labelClass}>
-                Title
+	                제목
               </label>
               <input
                 id="title"
@@ -182,14 +182,14 @@ export default function ReleaseEditClient() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className={inputClass}
-                placeholder="Bug fixes and improvements"
+	                placeholder="버그 수정 및 개선"
               />
             </div>
           </div>
 
           <div data-color-mode={isAdminRoute ? 'dark' : 'light'}>
             <label htmlFor="content" className={labelClass}>
-              Release Notes
+	              릴리스 노트
             </label>
             <MDEditor
               value={content}
@@ -208,7 +208,7 @@ export default function ReleaseEditClient() {
               className={isAdminRoute ? 'h-4 w-4 rounded border-white/20 bg-[#0C0C14] text-primary-500 focus:ring-primary-500' : 'h-4 w-4 rounded border-gray-300 bg-white text-primary-500 focus:ring-primary-500'}
             />
             <label htmlFor="published" className={isAdminRoute ? 'text-sm font-medium text-white/55' : 'text-sm font-medium text-gray-500'}>
-              Published
+	              게시됨
             </label>
           </div>
 
@@ -218,10 +218,10 @@ export default function ReleaseEditClient() {
               disabled={submitting}
               className={actionClass}
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+	              {submitting ? '저장 중...' : '변경 사항 저장'}
             </button>
             <Link href={isAdminRoute ? '/admin/changelog' : `/releases/${slug}`} className={isAdminRoute ? 'text-white/50 hover:text-white font-medium transition-colors' : 'text-gray-500 hover:text-gray-900 font-medium transition-colors'}>
-              Cancel
+	              취소
             </Link>
           </div>
         </form>

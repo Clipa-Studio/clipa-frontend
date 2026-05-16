@@ -1,5 +1,5 @@
-import { AdminEventsPage } from '../_components/AdminResourcePages'
+import { AdminEventAnalyticsPage } from '../_components/AdminResourcePages'
 
 export default function AdminEventsRoute() {
-  return <AdminEventsPage />
+  return <AdminEventAnalyticsPage />
 }

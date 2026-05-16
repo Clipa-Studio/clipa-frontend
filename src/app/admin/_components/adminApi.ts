@@ -72,6 +72,16 @@ export type AdminEventRow = {
   attributes: Record<string, unknown>
 }
 
+export type AdminEventsCursor = {
+  receivedAt: string
+  eventId: string
+}
+
+export type AdminEnvironmentMetric = {
+  today: number
+  yesterday: number
+}
+
 export type AdminDashboardData = {
   metrics: {
     totalUsers: number
@@ -79,6 +89,16 @@ export type AdminDashboardData = {
     usersYesterday: number
     clickEventsToday: number
     clickEventsYesterday: number
+    productEventsToday: number
+    productEventsYesterday: number
+    clickEventsByEnvironment: {
+      prod: AdminEnvironmentMetric
+      dev: AdminEnvironmentMetric
+    }
+    productEventsByEnvironment: {
+      prod: AdminEnvironmentMetric
+      dev: AdminEnvironmentMetric
+    }
     activeSubscriptions: number
     activeDevices: number
     draftPosts: number
@@ -92,7 +112,46 @@ export type AdminDashboardData = {
 export type AdminEventsResponse = {
   events: AdminEventRow[]
   eventNames: string[]
-  total: number
+  hasNextPage: boolean
+  nextCursor: AdminEventsCursor | null
+  limit: number
+}
+
+export type AdminEventAnalyticsSummary = {
+  totalEvents: number
+  clickEvents: number
+  uniqueClients: number
+  exportCompleted: number
+  exportFailed: number
+  exportBlocked: number
+  recordStarted: number
+  recordCompleted: number
+}
+
+export type AdminEventBreakdownRow = {
+  eventName: string
+  count: number
+}
+
+export type AdminEnvironmentBreakdownRow = {
+  environment: string
+  count: number
+}
+
+export type AdminFunnelRow = {
+  label: string
+  eventName: string
+  count: number
+}
+
+export type AdminIssueEventRow = Pick<AdminEventRow, 'event_id' | 'event_name' | 'environment' | 'app_version' | 'app_build' | 'os_version' | 'attributes' | 'received_at'>
+
+export type AdminEventAnalyticsResponse = {
+  summary: AdminEventAnalyticsSummary
+  breakdown: AdminEventBreakdownRow[]
+  environmentBreakdown: AdminEnvironmentBreakdownRow[]
+  funnel: AdminFunnelRow[]
+  issues: AdminIssueEventRow[]
 }
 
 type AdminResource =
@@ -103,18 +162,10 @@ type AdminResource =
   | 'blog'
   | 'changelog'
   | 'events'
-type CountQuery = ReturnType<ReturnType<typeof supabase.from>['select']>
+  | 'eventAnalytics'
 
-function startOfToday() {
-  const date = new Date()
-  date.setHours(0, 0, 0, 0)
-  return date
-}
-
-function startOfYesterday() {
-  const date = startOfToday()
-  date.setDate(date.getDate() - 1)
-  return date
+function getAdminTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul'
 }
 
 function toOptionalIso(value: unknown) {
@@ -130,16 +181,8 @@ function throwIfError(error: { message?: string } | null | undefined, fallback: 
 async function ensureSession() {
   const { data: { session }, error } = await supabase.auth.getSession()
   if (error || !session) {
-    throw new Error('Admin session not found. Sign in again.')
+    throw new Error('관리자 세션을 찾을 수 없습니다. 다시 로그인하세요.')
   }
-}
-
-async function getCount(table: string, apply?: (query: CountQuery) => CountQuery) {
-  let query = supabase.from(table).select('*', { count: 'exact', head: true })
-  if (apply) query = apply(query)
-  const { count, error } = await query
-  throwIfError(error, `Failed to count ${table}`)
-  return count ?? 0
 }
 
 async function getProfiles() {
@@ -149,7 +192,7 @@ async function getProfiles() {
     .order('created_at', { ascending: false })
     .limit(200)
 
-  throwIfError(error, 'Failed to load profiles')
+  throwIfError(error, '프로필을 불러오지 못했습니다.')
   return (data ?? []) as AdminProfileRow[]
 }
 
@@ -162,7 +205,7 @@ async function getProfileMap(userIds: string[]) {
     .select('id, email, display_name')
     .in('id', ids)
 
-  throwIfError(error, 'Failed to load profile map')
+  throwIfError(error, '프로필 정보를 불러오지 못했습니다.')
 
   return new Map(
     ((data ?? []) as Array<{ id: string; email: string | null; display_name: string | null }>).map((profile) => [
@@ -179,7 +222,7 @@ async function getSubscriptions() {
     .order('subscription_created_at', { ascending: false })
     .limit(200)
 
-  throwIfError(error, 'Failed to load subscriptions')
+  throwIfError(error, '구독 정보를 불러오지 못했습니다.')
 
   const rows = (data ?? []) as AdminSubscriptionRecord[]
   const profiles = await getProfileMap(rows.map((row) => row.user_id))
@@ -197,7 +240,7 @@ async function getDevices() {
     .order('activated_at', { ascending: false })
     .limit(200)
 
-  throwIfError(error, 'Failed to load devices')
+  throwIfError(error, '디바이스 정보를 불러오지 못했습니다.')
 
   const rows = (data ?? []) as AdminDeviceRecord[]
   const profiles = await getProfileMap(rows.map((row) => row.user_id))
@@ -219,7 +262,7 @@ async function getContent(table: 'blog_posts' | 'releases') {
     .order('updated_at', { ascending: false })
     .limit(200)
 
-  throwIfError(error, `Failed to load ${table}`)
+  throwIfError(error, `${table === 'blog_posts' ? '블로그' : 'ChangeLog'}를 불러오지 못했습니다.`)
   return (data ?? []) as AdminContentRow[]
 }
 
@@ -227,97 +270,111 @@ async function getEvents(params: Record<string, string | number | null | undefin
   const eventName = typeof params.eventName === 'string' ? params.eventName : ''
   const environment = typeof params.environment === 'string' ? params.environment : ''
   const since = typeof params.since === 'string' ? params.since : ''
-  const limit = Math.min(Number(params.limit || 100), 300)
+  const cursorReceivedAt = typeof params.cursorReceivedAt === 'string' && params.cursorReceivedAt.length > 0
+    ? params.cursorReceivedAt
+    : null
+  const cursorEventId = typeof params.cursorEventId === 'string' && params.cursorEventId.length > 0
+    ? params.cursorEventId
+    : null
+  const limit = Math.max(10, Math.min(Number(params.limit || 50), 100))
+  const sinceDays = since && since !== 'all' ? Number(since) : null
 
-  let query = supabase
-    .from('client_events')
-    .select('event_id, client_install_id, event_name, occurred_at, received_at, app_version, app_build, os_version, attributes, environment', { count: 'exact' })
-    .order('received_at', { ascending: false })
-    .limit(limit)
+  const { data, error } = await supabase.rpc('admin_get_events', {
+    p_event_name: eventName || null,
+    p_environment: environment || null,
+    p_since_days: Number.isFinite(sinceDays) ? sinceDays : null,
+    p_cursor_received_at: cursorReceivedAt,
+    p_cursor_event_id: cursorEventId,
+    p_limit: limit,
+  })
 
-  if (eventName) query = query.eq('event_name', eventName)
-  if (environment) query = query.eq('environment', environment)
-  if (since && since !== 'all') {
-    const date = new Date()
-    date.setDate(date.getDate() - Number(since))
-    query = query.gte('received_at', date.toISOString())
-  }
+  throwIfError(error, '이벤트 로그를 불러오지 못했습니다.')
 
-  const [{ data, error, count }, namesResult] = await Promise.all([
-    query,
-    supabase.from('client_events').select('event_name').order('event_name', { ascending: true }).limit(1000),
-  ])
-
-  throwIfError(error, 'Failed to load events')
-  throwIfError(namesResult.error, 'Failed to load event names')
+  const response = data as Partial<AdminEventsResponse> | null
 
   return {
-    events: (data ?? []) as AdminEventRow[],
-    eventNames: Array.from(new Set(((namesResult.data ?? []) as Array<{ event_name: string }>).map((event) => event.event_name))),
-    total: count ?? 0,
+    events: (response?.events ?? []) as AdminEventRow[],
+    eventNames: response?.eventNames ?? [],
+    hasNextPage: response?.hasNextPage === true,
+    nextCursor: response?.nextCursor ?? null,
+    limit: response?.limit ?? limit,
+  }
+}
+
+async function getEventAnalytics(params: Record<string, string | number | null | undefined>) {
+  const environment = typeof params.environment === 'string' ? params.environment : 'prod'
+  const since = typeof params.since === 'string' ? params.since : '7'
+  const sinceDays = since && since !== 'all' ? Number(since) : null
+
+  const { data, error } = await supabase.rpc('admin_get_event_analytics', {
+    p_environment: environment || 'prod',
+    p_since_days: Number.isFinite(sinceDays) ? sinceDays : null,
+    p_timezone: getAdminTimezone(),
+  })
+
+  throwIfError(error, '이벤트 분석을 불러오지 못했습니다.')
+
+  const response = data as Partial<AdminEventAnalyticsResponse> | null
+
+  return {
+    summary: {
+      totalEvents: response?.summary?.totalEvents ?? 0,
+      clickEvents: response?.summary?.clickEvents ?? 0,
+      uniqueClients: response?.summary?.uniqueClients ?? 0,
+      exportCompleted: response?.summary?.exportCompleted ?? 0,
+      exportFailed: response?.summary?.exportFailed ?? 0,
+      exportBlocked: response?.summary?.exportBlocked ?? 0,
+      recordStarted: response?.summary?.recordStarted ?? 0,
+      recordCompleted: response?.summary?.recordCompleted ?? 0,
+    },
+    breakdown: response?.breakdown ?? [],
+    environmentBreakdown: response?.environmentBreakdown ?? [],
+    funnel: response?.funnel ?? [],
+    issues: response?.issues ?? [],
   }
 }
 
 async function getDashboard() {
-  const today = startOfToday()
-  const yesterday = startOfYesterday()
+  const { data, error } = await supabase.rpc('admin_get_dashboard', {
+    p_timezone: getAdminTimezone(),
+    p_recent_limit: 8,
+  })
 
-  const [
-    totalUsers,
-    usersToday,
-    usersYesterday,
-    clickEventsToday,
-    clickEventsYesterday,
-    activeSubscriptions,
-    activeDevices,
-    draftPosts,
-    draftReleases,
-    latestReleaseResult,
-    recentUsers,
-    recentEventsResult,
-  ] = await Promise.all([
-    getCount('profiles'),
-    getCount('profiles', (query) => query.gte('created_at', today.toISOString())),
-    getCount('profiles', (query) => query.gte('created_at', yesterday.toISOString()).lt('created_at', today.toISOString())),
-    getCount('client_events', (query) => query.gte('received_at', today.toISOString()).ilike('event_name', '%.clicked')),
-    getCount('client_events', (query) => query.gte('received_at', yesterday.toISOString()).lt('received_at', today.toISOString()).ilike('event_name', '%.clicked')),
-    getCount('subscriptions', (query) => query.in('status', ['active', 'past_due'])),
-    getCount('user_devices'),
-    getCount('blog_posts', (query) => query.eq('published', false)),
-    getCount('releases', (query) => query.eq('published', false)),
-    supabase
-      .from('releases')
-      .select('id, title, version, slug, published, published_at, created_at, updated_at')
-      .eq('published', true)
-      .order('published_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    getProfiles().then((rows) => rows.slice(0, 5)),
-    supabase
-      .from('client_events')
-      .select('event_id, client_install_id, event_name, occurred_at, received_at, app_version, app_build, os_version, attributes, environment')
-      .order('received_at', { ascending: false })
-      .limit(8),
-  ])
+  throwIfError(error, '대시보드를 불러오지 못했습니다.')
 
-  throwIfError(latestReleaseResult.error, 'Failed to load latest release')
-  throwIfError(recentEventsResult.error, 'Failed to load recent events')
+  if (!data || typeof data !== 'object') {
+    throw new Error('대시보드를 불러오지 못했습니다.')
+  }
+
+  const dashboard = data as AdminDashboardData
 
   return {
+    ...dashboard,
     metrics: {
-      totalUsers,
-      usersToday,
-      usersYesterday,
-      clickEventsToday,
-      clickEventsYesterday,
-      activeSubscriptions,
-      activeDevices,
-      draftPosts,
-      draftReleases,
+      ...dashboard.metrics,
+      productEventsToday: dashboard.metrics.productEventsToday ?? 0,
+      productEventsYesterday: dashboard.metrics.productEventsYesterday ?? 0,
+      clickEventsByEnvironment: {
+        prod: {
+          today: dashboard.metrics.clickEventsByEnvironment?.prod?.today ?? 0,
+          yesterday: dashboard.metrics.clickEventsByEnvironment?.prod?.yesterday ?? 0,
+        },
+        dev: {
+          today: dashboard.metrics.clickEventsByEnvironment?.dev?.today ?? 0,
+          yesterday: dashboard.metrics.clickEventsByEnvironment?.dev?.yesterday ?? 0,
+        },
+      },
+      productEventsByEnvironment: {
+        prod: {
+          today: dashboard.metrics.productEventsByEnvironment?.prod?.today ?? 0,
+          yesterday: dashboard.metrics.productEventsByEnvironment?.prod?.yesterday ?? 0,
+        },
+        dev: {
+          today: dashboard.metrics.productEventsByEnvironment?.dev?.today ?? 0,
+          yesterday: dashboard.metrics.productEventsByEnvironment?.dev?.yesterday ?? 0,
+        },
+      },
     },
-    latestRelease: latestReleaseResult.data as AdminContentRow | null,
-    recentUsers,
-    recentEvents: (recentEventsResult.data ?? []) as AdminEventRow[],
   }
 }
 
@@ -326,7 +383,7 @@ async function createSubscription(body: Record<string, unknown>) {
   const userId = typeof body.user_id === 'string' ? body.user_id.trim() : ''
 
   if (!userId) {
-    throw new Error('user_id is required')
+    throw new Error('사용자 ID가 필요합니다.')
   }
 
   const payload = {
@@ -357,13 +414,13 @@ async function createSubscription(body: Record<string, unknown>) {
     .select()
     .single()
 
-  throwIfError(error, 'Failed to create subscription')
+  throwIfError(error, '구독 정보를 추가하지 못했습니다.')
   return { subscription: data }
 }
 
 async function deleteDevice(body: Record<string, unknown>) {
   if (typeof body.id !== 'string' || body.id.length === 0) {
-    throw new Error('id is required')
+    throw new Error('ID가 필요합니다.')
   }
 
   const { error } = await supabase
@@ -371,7 +428,7 @@ async function deleteDevice(body: Record<string, unknown>) {
     .delete()
     .eq('id', body.id)
 
-  throwIfError(error, 'Failed to deactivate device')
+  throwIfError(error, '디바이스를 비활성화하지 못했습니다.')
   return { ok: true }
 }
 
@@ -389,6 +446,7 @@ export async function adminFetch<T>(
     blog: async () => ({ posts: await getContent('blog_posts') }),
     changelog: async () => ({ releases: await getContent('releases') }),
     events: () => getEvents(params),
+    eventAnalytics: () => getEventAnalytics(params),
   } satisfies Record<AdminResource, () => Promise<unknown>>)[resource]()
 
   return result as T
@@ -409,5 +467,5 @@ export async function adminMutate<T>(
     return deleteDevice(body) as Promise<T>
   }
 
-  throw new Error('Unknown admin action')
+  throw new Error('알 수 없는 관리자 작업입니다.')
 }

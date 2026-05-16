@@ -33,7 +33,7 @@ export default function ReleaseEditorClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">불러오는 중...</p>
         </div>
       </>
     )
@@ -44,10 +44,10 @@ export default function ReleaseEditorClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Access denied</h1>
-          <p className="text-gray-500 mb-6">You do not have permission to create releases.</p>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>접근 권한 없음</h1>
+          <p className="text-gray-500 mb-6">ChangeLog를 만들 권한이 없습니다.</p>
           <Link href="/releases" className="text-primary-400 hover:text-primary-300 font-medium">
-            Back to Releases
+            ChangeLog로 돌아가기
           </Link>
         </div>
       </>
@@ -78,7 +78,7 @@ export default function ReleaseEditorClient() {
           : `/admin/changelog/${release.slug}/edit`,
       )
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create release')
+      setError(err instanceof Error ? err.message : 'ChangeLog를 만들지 못했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -98,7 +98,7 @@ export default function ReleaseEditorClient() {
     <>
       {!isAdminRoute && <Header />}
       <div className={pageClass}>
-        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>New Release</h1>
+        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>새 ChangeLog</h1>
 
         {error && (
           <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-400 text-sm">
@@ -110,7 +110,7 @@ export default function ReleaseEditorClient() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="version" className={labelClass}>
-                Version
+                버전
               </label>
               <input
                 id="version"
@@ -124,7 +124,7 @@ export default function ReleaseEditorClient() {
             </div>
             <div>
               <label htmlFor="title" className={labelClass}>
-                Title
+                제목
               </label>
               <input
                 id="title"
@@ -133,14 +133,14 @@ export default function ReleaseEditorClient() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className={inputClass}
-                placeholder="Bug fixes and improvements"
+                placeholder="버그 수정 및 개선"
               />
             </div>
           </div>
 
           <div data-color-mode={isAdminRoute ? 'dark' : 'light'}>
             <label htmlFor="content" className={labelClass}>
-              Release Notes
+              릴리스 노트
             </label>
             <MDEditor
               value={content}
@@ -159,7 +159,7 @@ export default function ReleaseEditorClient() {
               className={isAdminRoute ? 'h-4 w-4 rounded border-white/20 bg-[#0C0C14] text-primary-500 focus:ring-primary-500' : 'h-4 w-4 rounded border-gray-300 bg-white text-primary-500 focus:ring-primary-500'}
             />
             <label htmlFor="published" className={isAdminRoute ? 'text-sm font-medium text-white/55' : 'text-sm font-medium text-gray-500'}>
-              Publish immediately
+              바로 게시
             </label>
           </div>
 
@@ -169,10 +169,10 @@ export default function ReleaseEditorClient() {
               disabled={submitting}
               className={actionClass}
             >
-              {submitting ? 'Creating...' : 'Create Release'}
+	              {submitting ? '생성 중...' : 'ChangeLog 만들기'}
             </button>
             <Link href={isAdminRoute ? '/admin/changelog' : '/releases'} className={isAdminRoute ? 'text-white/50 hover:text-white font-medium transition-colors' : 'text-gray-500 hover:text-gray-900 font-medium transition-colors'}>
-              Cancel
+	              취소
             </Link>
           </div>
         </form>

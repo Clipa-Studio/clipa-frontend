@@ -97,7 +97,7 @@ export function StatusPill({ children, tone = 'neutral' }: { children: ReactNode
   )
 }
 
-export function LoadingState({ label = 'Loading...' }: { label?: string }) {
+export function LoadingState({ label = '불러오는 중...' }: { label?: string }) {
   return (
     <div className="flex min-h-[220px] items-center justify-center rounded-lg border border-white/10 bg-white/[0.02] text-white/50">
       <div className="flex items-center gap-3 text-sm">
@@ -118,7 +118,7 @@ export function ErrorState({ message }: { message: string }) {
 
 export function formatDateTime(value: string | null | undefined) {
   if (!value) return '-'
-  return new Date(value).toLocaleString('en-US', {
+  return new Date(value).toLocaleString('ko-KR', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -129,7 +129,7 @@ export function formatDateTime(value: string | null | undefined) {
 
 export function formatDate(value: string | null | undefined) {
   if (!value) return '-'
-  return new Date(value).toLocaleDateString('en-US', {
+  return new Date(value).toLocaleDateString('ko-KR', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

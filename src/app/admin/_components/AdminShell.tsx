@@ -18,32 +18,31 @@ type NavGroup = {
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Overview',
+    label: '개요',
     items: [
-      { label: 'Dashboard', href: '/admin', icon: 'dashboard' },
+      { label: '대시보드', href: '/admin', icon: 'dashboard' },
     ],
   },
   {
-    label: 'Users',
+    label: '사용자',
     items: [
-      { label: 'Profile', href: '/admin/profile', icon: 'user' },
-      { label: 'Subscription', href: '/admin/subscriptions', icon: 'card' },
-      { label: 'Device', href: '/admin/devices', icon: 'device' },
+      { label: '프로필', href: '/admin/profile', icon: 'user' },
+      { label: '구독', href: '/admin/subscriptions', icon: 'card' },
+      { label: '디바이스', href: '/admin/devices', icon: 'device' },
     ],
   },
   {
-    label: 'Content',
+    label: '콘텐츠',
     items: [
-      { label: 'Blog list', href: '/admin/blog', icon: 'post' },
-      { label: 'Blog create', href: '/admin/blog/new', icon: 'plus' },
-      { label: 'ChangeLog list', href: '/admin/changelog', icon: 'release' },
-      { label: 'ChangeLog create', href: '/admin/changelog/new', icon: 'plus' },
+      { label: '블로그', href: '/admin/blog', icon: 'post' },
+      { label: 'ChangeLog', href: '/admin/changelog', icon: 'release' },
     ],
   },
   {
-    label: 'Analytics',
+    label: '분석',
     items: [
-      { label: 'Click events', href: '/admin/events', icon: 'event' },
+      { label: '이벤트 분석', href: '/admin/events', icon: 'event' },
+      { label: '이벤트 로그', href: '/admin/events/logs', icon: 'event' },
     ],
   },
 ]
@@ -69,6 +68,7 @@ function NavIcon({ name }: { name: NavItem['icon'] }) {
 
 function isActive(pathname: string, href: string) {
   if (href === '/admin') return pathname === href
+  if (href === '/admin/events') return pathname === href
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -89,7 +89,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <main className="flex min-h-screen items-center justify-center bg-[#0C0C14] text-white">
         <div className="flex items-center gap-3 text-white/55">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-primary-300" />
-          <span className="text-sm">Checking admin access...</span>
+          <span className="text-sm">관리자 권한 확인 중...</span>
         </div>
       </main>
     )
@@ -102,13 +102,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           <Link href="/admin" className="mb-10 flex items-center gap-3">
             <img src="/images/logo.png" alt="Clipa" className="h-9 w-9" />
             <div>
-              <p className="text-lg font-semibold leading-tight">Clipa Admin</p>
+              <p className="text-lg font-semibold leading-tight">Clipa 관리자</p>
               <p className="text-xs text-white/45">admin.clipa.studio/admin</p>
             </div>
           </Link>
-          <h1 className="text-3xl font-bold tracking-tight">Admin sign in</h1>
+          <h1 className="text-3xl font-bold tracking-tight">관리자 로그인</h1>
           <p className="mt-3 text-sm leading-6 text-white/55">
-            Sign in with an account that has the admin role.
+            관리자 권한이 있는 계정으로 로그인하세요.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <button
@@ -116,14 +116,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               onClick={() => signInWithGoogle('admin')}
               className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#0C0C14] transition-colors hover:bg-white/90"
             >
-              Continue with Google
+              Google로 계속
             </button>
             <button
               type="button"
               onClick={() => signInWithGithub('admin')}
               className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:border-white/20 hover:text-white"
             >
-              Continue with GitHub
+              GitHub로 계속
             </button>
           </div>
         </div>
@@ -135,16 +135,16 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     return (
       <main className="min-h-screen bg-[#0C0C14] px-6 text-white">
         <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center">
-          <h1 className="text-3xl font-bold tracking-tight">Access denied</h1>
+          <h1 className="text-3xl font-bold tracking-tight">접근 권한 없음</h1>
           <p className="mt-3 text-sm leading-6 text-white/55">
-            {user.email} is signed in, but this account does not have the admin role.
+            {user.email} 계정은 로그인되어 있지만 관리자 권한이 없습니다.
           </p>
           <button
             type="button"
             onClick={handleSignOut}
             className="mt-8 w-fit rounded-lg border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:border-white/20 hover:text-white"
           >
-            Sign out
+            로그아웃
           </button>
         </div>
       </main>
@@ -159,10 +159,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
               <Link href="/admin" className="flex items-center gap-3">
                 <img src="/images/logo.png" alt="Clipa" className="h-8 w-8" />
-                <div>
-                  <p className="text-base font-semibold leading-tight">Clipa Admin</p>
-                  <p className="text-xs text-white/40">Operations</p>
-                </div>
+	                <div>
+	                  <p className="text-base font-semibold leading-tight">Clipa 관리자</p>
+	                  <p className="text-xs text-white/40">운영 콘솔</p>
+	                </div>
               </Link>
             </div>
 
@@ -207,9 +207,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 type="button"
                 onClick={handleSignOut}
                 className="mt-3 w-full rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-white/65 transition-colors hover:border-white/20 hover:text-white"
-              >
-                Sign out
-              </button>
+	              >
+	                로그아웃
+	              </button>
             </div>
           </div>
         </aside>

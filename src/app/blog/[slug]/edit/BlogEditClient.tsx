@@ -63,7 +63,7 @@ export default function BlogEditClient() {
       const url = await uploadBlogImage(file)
       setCoverImageUrl(url)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to upload image')
+      setError(err instanceof Error ? err.message : '이미지를 업로드하지 못했습니다.')
     } finally {
       setUploading(false)
     }
@@ -109,7 +109,7 @@ export default function BlogEditClient() {
         }
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to upload media')
+      setError(err instanceof Error ? err.message : '미디어를 업로드하지 못했습니다.')
     } finally {
       setUploadingMedia(false)
     }
@@ -124,7 +124,7 @@ export default function BlogEditClient() {
           ? await getPostById(postKey)
           : await getPostBySlug(postKey!)
         if (!data) {
-          setError('Post not found')
+          setError('글을 찾을 수 없습니다.')
           setLoadingPost(false)
           return
         }
@@ -140,7 +140,7 @@ export default function BlogEditClient() {
         )
         setPublished(data.published)
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to load post')
+        setError(err instanceof Error ? err.message : '글을 불러오지 못했습니다.')
       } finally {
         setLoadingPost(false)
       }
@@ -154,7 +154,7 @@ export default function BlogEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">불러오는 중...</p>
         </div>
       </>
     )
@@ -165,10 +165,10 @@ export default function BlogEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Access denied</h1>
-          <p className="text-gray-500 mb-6">You do not have permission to edit blog posts.</p>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>접근 권한 없음</h1>
+          <p className="text-gray-500 mb-6">블로그 글을 수정할 권한이 없습니다.</p>
           <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
-            Back to Blog
+            블로그로 돌아가기
           </Link>
         </div>
       </>
@@ -180,9 +180,9 @@ export default function BlogEditClient() {
       <>
         {!isAdminRoute && <Header />}
         <div className={pageClass}>
-          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>Post not found</h1>
+          <h1 className={isAdminRoute ? 'text-2xl font-bold text-white mb-4' : 'text-2xl font-bold text-gray-900 mb-4'}>글을 찾을 수 없습니다.</h1>
           <Link href="/blog/overview" className="text-primary-400 hover:text-primary-300 font-medium">
-            Back to Blog
+            블로그로 돌아가기
           </Link>
         </div>
       </>
@@ -200,7 +200,7 @@ export default function BlogEditClient() {
       const wasPublished = post.published
       let publishedAt = post.published_at
 
-      // If switching from unpublished to published, set published_at
+      // 초안에서 게시 상태로 바뀌는 시점에 published_at을 기록한다.
       if (published && !wasPublished && !publishedAt) {
         publishedAt = new Date().toISOString()
       }
@@ -220,7 +220,7 @@ export default function BlogEditClient() {
           : `/admin/blog/${updatedPost.id}/edit`,
       )
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update post')
+      setError(err instanceof Error ? err.message : '글을 저장하지 못했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -240,7 +240,7 @@ export default function BlogEditClient() {
     <>
       {!isAdminRoute && <Header />}
       <div className={pageClass}>
-        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>Edit Blog Post</h1>
+        <h1 className={isAdminRoute ? 'text-3xl font-bold text-white mb-8' : 'text-3xl font-bold text-gray-900 mb-8'}>블로그 글 수정</h1>
 
         {error && (
           <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-400 text-sm">
@@ -251,7 +251,7 @@ export default function BlogEditClient() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="title" className={labelClass}>
-              Title
+              제목
             </label>
             <input
               id="title"
@@ -260,13 +260,13 @@ export default function BlogEditClient() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className={inputClass}
-              placeholder="Post title"
+              placeholder="글 제목"
             />
           </div>
 
           <div>
             <label htmlFor="category" className={labelClass}>
-              Category
+              카테고리
             </label>
             <select
               id="category"
@@ -285,7 +285,7 @@ export default function BlogEditClient() {
 
           <div>
             <label htmlFor="excerpt" className={labelClass}>
-              Excerpt
+              요약
             </label>
             <textarea
               id="excerpt"
@@ -293,13 +293,13 @@ export default function BlogEditClient() {
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
               className={inputClass}
-              placeholder="Brief summary of the post"
+              placeholder="글의 짧은 요약"
             />
           </div>
 
           <div data-color-mode={isAdminRoute ? 'dark' : 'light'}>
             <label htmlFor="content" className={labelClass}>
-              Content
+              내용
             </label>
             <div
               ref={editorRef}
@@ -314,24 +314,24 @@ export default function BlogEditClient() {
               />
             </div>
             {uploadingMedia && (
-              <p className="mt-2 text-sm text-gray-400">Uploading media...</p>
+	              <p className="mt-2 text-sm text-gray-400">미디어 업로드 중...</p>
             )}
           </div>
 
           <div>
             <label className={labelClass}>
-              Cover Image
+	              커버 이미지
             </label>
             {(coverPreview || coverImageUrl) && (
               <div className="mb-3 relative">
                 <img
                   src={coverPreview || coverImageUrl}
-                  alt="Cover preview"
+	                  alt="커버 미리보기"
                   className={isAdminRoute ? 'w-full max-h-48 object-cover rounded-lg border border-white/10' : 'w-full max-h-48 object-cover rounded-xl border border-gray-200'}
                 />
                 {uploading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
-                    <span className="text-white text-sm font-medium">Uploading...</span>
+	                    <span className="text-white text-sm font-medium">업로드 중...</span>
                   </div>
                 )}
                 <button
@@ -353,7 +353,7 @@ export default function BlogEditClient() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              {uploading ? 'Uploading...' : coverImageUrl ? 'Change cover image' : 'Click to upload cover image'}
+	              {uploading ? '업로드 중...' : coverImageUrl ? '커버 이미지 변경' : '커버 이미지 업로드'}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp"
@@ -372,7 +372,7 @@ export default function BlogEditClient() {
               className={isAdminRoute ? 'h-4 w-4 rounded border-white/20 bg-[#0C0C14] text-primary-500 focus:ring-primary-500' : 'h-4 w-4 rounded border-gray-300 bg-white text-primary-500 focus:ring-primary-500'}
             />
             <label htmlFor="published" className={isAdminRoute ? 'text-sm font-medium text-white/55' : 'text-sm font-medium text-gray-500'}>
-              Published
+              게시됨
             </label>
           </div>
 
@@ -382,13 +382,13 @@ export default function BlogEditClient() {
               disabled={submitting}
               className={actionClass}
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+	              {submitting ? '저장 중...' : '변경 사항 저장'}
             </button>
             <Link
               href={isAdminRoute ? '/admin/blog' : (post.published ? getBlogPostHref({ ...post, category_slug: categorySlug }) : '/blog/overview')}
               className={isAdminRoute ? 'text-white/50 hover:text-white font-medium transition-colors' : 'text-gray-500 hover:text-gray-900 font-medium transition-colors'}
             >
-              Cancel
+	              취소
             </Link>
           </div>
         </form>
