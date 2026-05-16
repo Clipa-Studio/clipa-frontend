@@ -79,35 +79,33 @@ export function AdminProfilesPage() {
     <>
       <PageHeader
         title="Profile"
-        description="Profile and authentication data combined into one operational view."
+        description="Synced user profile data from Supabase Auth with the current admin role."
       />
 
       <Panel title={`${profiles.length} profiles`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-white/10 text-xs uppercase tracking-[0.08em] text-white/35">
               <tr>
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Role</th>
-                <th className="px-4 py-3 font-medium">Email confirmed</th>
-                <th className="px-4 py-3 font-medium">Last sign in</th>
                 <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium">Updated</th>
                 <th className="px-4 py-3 font-medium">ID</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {profiles.length === 0 ? (
-                <EmptyRow colSpan={6} label="No profiles found." />
+                <EmptyRow colSpan={5} label="No profiles found." />
               ) : profiles.map((profile) => (
                 <tr key={profile.id} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-white/85">{profile.display_name || profile.email || profile.auth_email || 'Unnamed user'}</p>
-                    <p className="mt-1 text-xs text-white/40">{profile.email || profile.auth_email || '-'}</p>
+                    <p className="font-medium text-white/85">{profile.display_name || profile.email || 'Unnamed user'}</p>
+                    <p className="mt-1 text-xs text-white/40">{profile.email || '-'}</p>
                   </td>
                   <td className="px-4 py-3"><StatusPill tone={roleTone(profile.role)}>{profile.role}</StatusPill></td>
-                  <td className="px-4 py-3 text-white/55">{formatDateTime(profile.email_confirmed_at)}</td>
-                  <td className="px-4 py-3 text-white/55">{formatDateTime(profile.last_sign_in_at)}</td>
                   <td className="px-4 py-3 text-white/55">{formatDateTime(profile.created_at)}</td>
+                  <td className="px-4 py-3 text-white/55">{formatDateTime(profile.updated_at)}</td>
                   <td className="px-4 py-3 font-mono text-xs text-white/35">{profile.id}</td>
                 </tr>
               ))}

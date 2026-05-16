@@ -113,7 +113,7 @@ export default function AdminDashboardClient() {
             {data.recentUsers.map((profile) => (
               <div key={profile.id} className="px-4 py-3">
                 <p className="truncate text-sm font-medium text-white/80">
-                  {profile.email || profile.auth_email || profile.id}
+                  {profile.email || profile.id}
                 </p>
                 <p className="mt-1 text-xs text-white/40">{formatDateTime(profile.created_at)}</p>
               </div>
