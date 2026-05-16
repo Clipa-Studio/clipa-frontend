@@ -14,6 +14,7 @@ export default function AuthCallbackClient() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      const isAdminHost = window.location.hostname === 'admin.clipa.studio'
       // PKCE flow: URL에 code가 있으면 세션으로 교환
       const url = new URL(window.location.href)
       const code = url.searchParams.get('code')
@@ -43,6 +44,11 @@ export default function AuthCallbackClient() {
 
       const state = searchParams.get('state') || ''
       const user = data.session.user
+
+      if (from === 'admin' || isAdminHost) {
+        router.replace('/admin')
+        return
+      }
 
       // 구독 상태 조회
       const subscription = await getSubscription(user.id)

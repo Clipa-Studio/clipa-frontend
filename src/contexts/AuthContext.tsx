@@ -45,7 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const buildRedirectUrl = (from?: string, state?: string) => {
     const base = `${window.location.origin}/auth/callback`
     const params = new URLSearchParams()
-    if (from) params.set('from', from)
+    const useExactAdminCallback = from === 'admin' && window.location.hostname === 'admin.clipa.studio'
+    if (from && !useExactAdminCallback) params.set('from', from)
     if (state) params.set('state', state)
     const qs = params.toString()
     return qs ? `${base}?${qs}` : base
