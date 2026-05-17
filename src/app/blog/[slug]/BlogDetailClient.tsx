@@ -1,87 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
-import { useAdmin } from '../../../hooks/useAdmin'
-import { deletePost, getPostBySlug } from '../../../lib/blog'
 import type { BlogPost } from '../../../lib/blog'
 
 interface BlogDetailClientProps {
   initialPost: BlogPost | null
-  slug: string
   backHref?: string
   backLabel?: string
 }
 
 export default function BlogDetailClient({
   initialPost,
-  slug,
   backHref = '/blog/overview',
   backLabel = 'Back to Blog',
 }: BlogDetailClientProps) {
-  const router = useRouter()
-  const { isAdmin, loading: adminLoading } = useAdmin()
-  const [draftPost, setDraftPost] = useState<BlogPost | null>(null)
-  const [draftLoaded, setDraftLoaded] = useState(false)
-  const post = initialPost ?? draftPost
-  const loadingPost = !initialPost && (adminLoading || (isAdmin && !draftLoaded))
-
-  useEffect(() => {
-    if (initialPost || adminLoading || !isAdmin) return
-
-    let cancelled = false
-
-    async function fetchDraftPost() {
-      try {
-        const data = await getPostBySlug(slug)
-        if (!cancelled) setDraftPost(data)
-      } catch (error) {
-        console.error('Failed to load draft post:', error)
-        if (!cancelled) setDraftPost(null)
-      } finally {
-        if (!cancelled) setDraftLoaded(true)
-      }
-    }
-
-    fetchDraftPost()
-
-    return () => {
-      cancelled = true
-    }
-  }, [adminLoading, initialPost, isAdmin, slug])
-
-  const handleDelete = async () => {
-    if (!post) return
-
-    const confirmed = window.confirm('Are you sure you want to delete this post?')
-    if (!confirmed) return
-
-    try {
-      await deletePost(post.id)
-      router.push(backHref)
-    } catch (error) {
-      console.error('Failed to delete post:', error)
-      alert('Failed to delete the post.')
-    }
-  }
-
-  if (loadingPost || (!initialPost && adminLoading)) {
-    return (
-      <div className="min-h-screen flex flex-col bg-[#0C0C14]">
-        <Header />
-        <main className="relative z-10 max-w-3xl mx-auto pt-28 pb-20 px-4 flex-grow w-full">
-          <p className="text-white/50">Loading post...</p>
-        </main>
-        <Footer />
-      </div>
-    )
-  }
+  const post = initialPost
 
   if (!post) {
     return (
@@ -156,22 +94,6 @@ export default function BlogDetailClient({
           </ReactMarkdown>
         </article>
 
-        {isAdmin && (
-          <div className="flex items-center gap-4 mt-16 pt-8 border-t border-white/10">
-            <Link
-              href={`/admin/blog/${post.id}/edit`}
-              className="btn-block-ghost btn-block-sm"
-            >
-              Edit
-            </Link>
-            <button
-              onClick={handleDelete}
-              className="btn-block-ghost btn-block-sm !text-red-400 !border-red-500/20 hover:!bg-red-500/10"
-            >
-              Delete
-            </button>
-          </div>
-        )}
       </main>
       <Footer />
     </div>

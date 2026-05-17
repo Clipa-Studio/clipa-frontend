@@ -1,13 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
-import { useAdmin } from '../../hooks/useAdmin'
-import { getAllReleases } from '../../lib/releases'
 import type { Release } from '../../lib/releases'
 
 function formatDate(dateString: string): string {
@@ -40,7 +37,7 @@ function ReleaseMeta({ release, isLatest }: { release: Release; isLatest?: boole
   )
 }
 
-function LatestRelease({ release, isAdmin }: { release: Release; isAdmin: boolean }) {
+function LatestRelease({ release }: { release: Release }) {
   return (
     <section className="glass-card-static !rounded-2xl p-6 md:p-8">
       <div className="mb-5">
@@ -67,20 +64,12 @@ function LatestRelease({ release, isAdmin }: { release: Release; isAdmin: boolea
         >
           View details
         </Link>
-        {isAdmin && (
-          <Link
-            href={`/admin/changelog/${release.slug}/edit`}
-            className="text-sm text-white/40 hover:text-primary-400 transition-colors"
-          >
-            Edit
-          </Link>
-        )}
       </div>
     </section>
   )
 }
 
-function ReleaseListItem({ release, isAdmin }: { release: Release; isAdmin: boolean }) {
+function ReleaseListItem({ release }: { release: Release }) {
   return (
     <div className="group flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors">
       <Link href={`/releases/${release.slug}`} className="group min-w-0 flex-1">
@@ -105,14 +94,6 @@ function ReleaseListItem({ release, isAdmin }: { release: Release; isAdmin: bool
       </Link>
 
       <div className="flex shrink-0 items-center gap-4">
-        {isAdmin && (
-          <Link
-            href={`/admin/changelog/${release.slug}/edit`}
-            className="text-xs text-white/40 hover:text-primary-400 transition-colors"
-          >
-            Edit
-          </Link>
-        )}
         <Link
           href={`/releases/${release.slug}`}
           aria-label={`View release v${release.version}`}
@@ -130,29 +111,7 @@ interface ReleaseListClientProps {
 }
 
 export default function ReleaseListClient({ initialReleases }: ReleaseListClientProps) {
-  const { isAdmin } = useAdmin()
-  const [adminReleases, setAdminReleases] = useState<Release[] | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!isAdmin) return
-
-    async function fetchReleases() {
-      await Promise.resolve()
-      setLoading(true)
-      try {
-        const data = await getAllReleases()
-        setAdminReleases(data)
-      } catch (err) {
-        console.error('Failed to fetch releases:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchReleases()
-  }, [isAdmin])
-
-  const releases = isAdmin && adminReleases ? adminReleases : initialReleases
+  const releases = initialReleases
   const latestRelease = releases[0]
   const previousReleases = releases.slice(1)
 
@@ -172,22 +131,9 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
           <p className="text-base sm:text-lg text-white/50 max-w-lg mx-auto animate-on-load delay-2">
             All the latest updates and improvements.
           </p>
-          {isAdmin && (
-            <Link
-              href="/admin/changelog/new"
-              className="btn-block btn-block-sm mt-6 animate-on-load delay-3"
-            >
-              New Release
-            </Link>
-          )}
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 animate-on-load">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto mb-4" />
-            <p className="text-white/50 text-sm">Loading releases...</p>
-          </div>
-        ) : releases.length === 0 ? (
+        {releases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 animate-on-load">
             <svg className="w-12 h-12 text-gray-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
@@ -198,7 +144,7 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
         ) : latestRelease ? (
           <div className="space-y-12">
             <div className="animate-on-load">
-              <LatestRelease release={latestRelease} isAdmin={isAdmin} />
+              <LatestRelease release={latestRelease} />
             </div>
 
             {previousReleases.length > 0 && (
@@ -214,7 +160,6 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
                     <ReleaseListItem
                       key={release.id}
                       release={release}
-                      isAdmin={isAdmin}
                     />
                   ))}
                 </div>

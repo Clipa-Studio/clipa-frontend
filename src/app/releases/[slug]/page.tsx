@@ -54,5 +54,5 @@ export default async function ReleaseDetailPage({ params }: Props) {
     .eq('published', true)
     .maybeSingle()
 
-  return <ReleaseDetailClient initialRelease={release as Release | null} slug={slug} />
+  return <ReleaseDetailClient initialRelease={release as Release | null} />
 }

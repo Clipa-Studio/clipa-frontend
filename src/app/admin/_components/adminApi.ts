@@ -121,9 +121,12 @@ export type AdminEventAnalyticsSummary = {
   totalEvents: number
   clickEvents: number
   uniqueClients: number
+  exportClicked: number
   exportCompleted: number
-  exportFailed: number
-  exportBlocked: number
+  watermarkedExports: number
+  recordErrors: number
+  editorErrors: number
+  exportErrors: number
   recordStarted: number
   recordCompleted: number
 }
@@ -178,10 +181,31 @@ function throwIfError(error: { message?: string } | null | undefined, fallback: 
   if (error) throw new Error(error.message || fallback)
 }
 
+function eventDateLowerBound(sinceDays: number | null) {
+  if (!Number.isFinite(sinceDays)) return null
+  return new Date(Date.now() - Number(sinceDays) * 24 * 60 * 60 * 1000).toISOString()
+}
+
 async function ensureSession() {
   const { data: { session }, error } = await supabase.auth.getSession()
   if (error || !session) {
     throw new Error('관리자 세션을 찾을 수 없습니다. 다시 로그인하세요.')
+  }
+
+  return session
+}
+
+async function ensureAdminSession() {
+  const session = await ensureSession()
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', session.user.id)
+    .single()
+
+  if (error || data?.role !== 'admin') {
+    throw new Error('관리자 권한이 필요합니다.')
   }
 }
 
@@ -269,6 +293,7 @@ async function getContent(table: 'blog_posts' | 'releases') {
 async function getEvents(params: Record<string, string | number | null | undefined>) {
   const eventName = typeof params.eventName === 'string' ? params.eventName : ''
   const environment = typeof params.environment === 'string' ? params.environment : ''
+  const clientInstallId = typeof params.clientInstallId === 'string' ? params.clientInstallId.trim() : ''
   const since = typeof params.since === 'string' ? params.since : ''
   const cursorReceivedAt = typeof params.cursorReceivedAt === 'string' && params.cursorReceivedAt.length > 0
     ? params.cursorReceivedAt
@@ -279,14 +304,30 @@ async function getEvents(params: Record<string, string | number | null | undefin
   const limit = Math.max(10, Math.min(Number(params.limit || 50), 100))
   const sinceDays = since && since !== 'all' ? Number(since) : null
 
-  const { data, error } = await supabase.rpc('admin_get_events', {
+  const rpcParams = {
     p_event_name: eventName || null,
     p_environment: environment || null,
     p_since_days: Number.isFinite(sinceDays) ? sinceDays : null,
     p_cursor_received_at: cursorReceivedAt,
     p_cursor_event_id: cursorEventId,
     p_limit: limit,
-  })
+  }
+
+  const { data, error } = await supabase.rpc('admin_get_events', clientInstallId
+    ? { ...rpcParams, p_client_install_id: clientInstallId }
+    : rpcParams)
+
+  if (error && clientInstallId) {
+    return getEventsByClient({
+      clientInstallId,
+      eventName,
+      environment,
+      sinceDays: Number.isFinite(sinceDays) ? sinceDays : null,
+      cursorReceivedAt,
+      cursorEventId,
+      limit,
+    })
+  }
 
   throwIfError(error, '이벤트 로그를 불러오지 못했습니다.')
 
@@ -298,6 +339,68 @@ async function getEvents(params: Record<string, string | number | null | undefin
     hasNextPage: response?.hasNextPage === true,
     nextCursor: response?.nextCursor ?? null,
     limit: response?.limit ?? limit,
+  }
+}
+
+async function getEventsByClient({
+  clientInstallId,
+  eventName,
+  environment,
+  sinceDays,
+  cursorReceivedAt,
+  cursorEventId,
+  limit,
+}: {
+  clientInstallId: string
+  eventName: string
+  environment: string
+  sinceDays: number | null
+  cursorReceivedAt: string | null
+  cursorEventId: string | null
+  limit: number
+}) {
+  const sinceLowerBound = eventDateLowerBound(sinceDays)
+  let query = supabase
+    .from('client_events')
+    .select('event_id, client_install_id, event_name, occurred_at, received_at, app_version, app_build, os_version, environment, attributes')
+    .eq('client_install_id', clientInstallId)
+    .order('received_at', { ascending: false })
+    .order('event_id', { ascending: false })
+    .limit(limit + 1)
+
+  if (eventName) query = query.eq('event_name', eventName)
+  if (environment) query = query.eq('environment', environment)
+  if (sinceLowerBound) query = query.gte('received_at', sinceLowerBound)
+  if (cursorReceivedAt && cursorEventId) {
+    query = query.or(`received_at.lt.${cursorReceivedAt},and(received_at.eq.${cursorReceivedAt},event_id.lt.${cursorEventId})`)
+  }
+
+  const { data, error } = await query
+  throwIfError(error, '이벤트 로그를 불러오지 못했습니다.')
+
+  let namesQuery = supabase
+    .from('client_events')
+    .select('event_name')
+    .eq('client_install_id', clientInstallId)
+    .order('event_name', { ascending: true })
+    .limit(1000)
+
+  if (environment) namesQuery = namesQuery.eq('environment', environment)
+  if (sinceLowerBound) namesQuery = namesQuery.gte('received_at', sinceLowerBound)
+
+  const { data: eventNameRows, error: eventNamesError } = await namesQuery
+  throwIfError(eventNamesError, '이벤트 이름 목록을 불러오지 못했습니다.')
+
+  const rows = ((data ?? []) as AdminEventRow[])
+  const events = rows.slice(0, limit)
+  const extraRow = rows[limit]
+
+  return {
+    events,
+    eventNames: Array.from(new Set(((eventNameRows ?? []) as Array<{ event_name: string | null }>).map((row) => row.event_name).filter(Boolean))) as string[],
+    hasNextPage: rows.length > limit,
+    nextCursor: extraRow ? { receivedAt: extraRow.received_at, eventId: extraRow.event_id } : null,
+    limit,
   }
 }
 
@@ -321,9 +424,12 @@ async function getEventAnalytics(params: Record<string, string | number | null |
       totalEvents: response?.summary?.totalEvents ?? 0,
       clickEvents: response?.summary?.clickEvents ?? 0,
       uniqueClients: response?.summary?.uniqueClients ?? 0,
+      exportClicked: response?.summary?.exportClicked ?? 0,
       exportCompleted: response?.summary?.exportCompleted ?? 0,
-      exportFailed: response?.summary?.exportFailed ?? 0,
-      exportBlocked: response?.summary?.exportBlocked ?? 0,
+      watermarkedExports: response?.summary?.watermarkedExports ?? 0,
+      recordErrors: response?.summary?.recordErrors ?? 0,
+      editorErrors: response?.summary?.editorErrors ?? 0,
+      exportErrors: response?.summary?.exportErrors ?? 0,
       recordStarted: response?.summary?.recordStarted ?? 0,
       recordCompleted: response?.summary?.recordCompleted ?? 0,
     },
@@ -381,29 +487,29 @@ async function getDashboard() {
 async function createSubscription(body: Record<string, unknown>) {
   const now = new Date().toISOString()
   const userId = typeof body.user_id === 'string' ? body.user_id.trim() : ''
+  const type = body.type === 'limitless' ? 'limitless' : 'subscription'
+  const periodEnd = type === 'subscription' ? toOptionalIso(body.subscription_period_end) : null
 
   if (!userId) {
     throw new Error('사용자 ID가 필요합니다.')
   }
 
+  if (type === 'subscription' && !periodEnd) {
+    throw new Error('구독 종료일이 필요합니다.')
+  }
+
   const payload = {
     user_id: userId,
-    type: typeof body.type === 'string' && body.type.length > 0 ? body.type : 'subscription',
-    status: typeof body.status === 'string' && body.status.length > 0 ? body.status : 'active',
-    paddle_customer_id: typeof body.paddle_customer_id === 'string' && body.paddle_customer_id.length > 0
-      ? body.paddle_customer_id
-      : `manual-${userId}`,
-    paddle_subscription_id: typeof body.paddle_subscription_id === 'string' && body.paddle_subscription_id.length > 0
-      ? body.paddle_subscription_id
-      : null,
+    type,
+    status: 'active',
+    paddle_customer_id: `manual-${userId}`,
+    paddle_subscription_id: null,
     paddle_transaction_id: null,
-    product_id: typeof body.product_id === 'string' && body.product_id.length > 0 ? body.product_id : 'manual',
-    price_id: typeof body.price_id === 'string' && body.price_id.length > 0 ? body.price_id : 'manual',
-    billing_cycle_interval: body.type === 'limitless'
-      ? null
-      : (typeof body.billing_cycle_interval === 'string' && body.billing_cycle_interval.length > 0 ? body.billing_cycle_interval : 'month'),
+    product_id: 'manual',
+    price_id: 'manual',
+    billing_cycle_interval: type === 'limitless' ? null : 'month',
     subscription_period_start: now,
-    subscription_period_end: toOptionalIso(body.subscription_period_end),
+    subscription_period_end: periodEnd,
     next_billed_at: null,
     subscription_created_at: now,
   }
@@ -416,6 +522,35 @@ async function createSubscription(body: Record<string, unknown>) {
 
   throwIfError(error, '구독 정보를 추가하지 못했습니다.')
   return { subscription: data }
+}
+
+async function revokeSubscriptions(body: Record<string, unknown>) {
+  const userId = typeof body.user_id === 'string' ? body.user_id.trim() : ''
+  const now = new Date().toISOString()
+
+  if (!userId) {
+    throw new Error('사용자 ID가 필요합니다.')
+  }
+
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update({
+      status: 'canceled',
+      canceled_at: now,
+      subscription_period_end: now,
+      next_billed_at: null,
+    })
+    .eq('user_id', userId)
+    .in('status', ['active', 'past_due'])
+    .select('id')
+
+  throwIfError(error, '구독권을 회수하지 못했습니다.')
+
+  if (!data || data.length === 0) {
+    throw new Error('회수할 활성 구독권이 없습니다.')
+  }
+
+  return { ok: true, count: data.length }
 }
 
 async function deleteDevice(body: Record<string, unknown>) {
@@ -436,7 +571,7 @@ export async function adminFetch<T>(
   resource: AdminResource,
   params: Record<string, string | number | null | undefined> = {},
 ): Promise<T> {
-  await ensureSession()
+  await ensureAdminSession()
 
   const result = await ({
     dashboard: () => getDashboard(),
@@ -454,13 +589,17 @@ export async function adminFetch<T>(
 
 export async function adminMutate<T>(
   resource: 'subscriptions' | 'devices',
-  method: 'POST' | 'DELETE',
+  method: 'POST' | 'PATCH' | 'DELETE',
   body: Record<string, unknown>,
 ): Promise<T> {
-  await ensureSession()
+  await ensureAdminSession()
 
   if (resource === 'subscriptions' && method === 'POST') {
     return createSubscription(body) as Promise<T>
+  }
+
+  if (resource === 'subscriptions' && method === 'PATCH') {
+    return revokeSubscriptions(body) as Promise<T>
   }
 
   if (resource === 'devices' && method === 'DELETE') {

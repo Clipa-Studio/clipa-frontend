@@ -106,11 +106,9 @@ export default async function BlogArticlePage({ categorySlug, cleanSlug }: BlogA
       )}
       <BlogDetailClient
         initialPost={post}
-        slug={post?.slug ?? cleanSlug}
         backHref={`/blog/${categorySlug}`}
         backLabel={`Back to ${category.label}`}
       />
     </>
   )
 }
-
