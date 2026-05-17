@@ -15,6 +15,19 @@ export interface BlogPost {
   updated_at: string;
 }
 
+export type BlogPostSummary = Pick<
+  BlogPost,
+  | 'id'
+  | 'title'
+  | 'slug'
+  | 'excerpt'
+  | 'cover_image_url'
+  | 'category_slug'
+  | 'published'
+  | 'published_at'
+  | 'updated_at'
+>;
+
 const RESERVED_BLOG_SLUGS = new Set([
   'new',
   'manage',

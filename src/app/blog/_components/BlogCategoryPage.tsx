@@ -1,4 +1,4 @@
-import { getPublishedPosts } from '../../../lib/blog'
+import { getPublishedPostSummaries } from '../../../lib/publicContent'
 import type { BlogCategorySlug } from '../../../lib/blogCategories'
 import BlogListClient from '../BlogListClient'
 
@@ -7,8 +7,7 @@ interface BlogCategoryPageProps {
 }
 
 export default async function BlogCategoryPage({ categorySlug }: BlogCategoryPageProps) {
-  const posts = await getPublishedPosts()
+  const posts = await getPublishedPostSummaries()
 
   return <BlogListClient initialPosts={posts} categorySlug={categorySlug} />
 }
-

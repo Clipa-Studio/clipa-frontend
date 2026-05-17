@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import Header from '../../../../components/Header'
 import { useAuth } from '../../../../contexts/AuthContext'
 import { useAdmin } from '../../../../hooks/useAdmin'
+import { revalidatePublicContent } from '../../../../lib/revalidateContent'
 import { updateRelease, getReleaseBySlug } from '../../../../lib/releases'
 import type { Release } from '../../../../lib/releases'
 
@@ -114,12 +115,16 @@ export default function ReleaseEditClient() {
         publishedAt = new Date().toISOString()
       }
 
-      await updateRelease(release.id, {
+      const updatedRelease = await updateRelease(release.id, {
         version,
         title,
         content,
         published,
         published_at: publishedAt,
+      })
+      void revalidatePublicContent({
+        resource: 'releases',
+        slug: updatedRelease.slug,
       })
       router.push(
         published

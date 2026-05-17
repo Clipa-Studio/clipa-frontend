@@ -1,27 +1,16 @@
 import type { Metadata } from 'next'
-import { supabase } from '../../../lib/supabase'
-import { getBlogCategory, resolveCurrentSlugForCategoryPath, type BlogCategorySlug } from '../../../lib/blogCategories'
+import { notFound } from 'next/navigation'
+import { getBlogCategory, getPostRouteInfo, type BlogCategorySlug } from '../../../lib/blogCategories'
+import { getPublishedPostForCategoryPath, getPublishedPostSummaries } from '../../../lib/publicContent'
 import BlogDetailClient from '../[slug]/BlogDetailClient'
-import type { BlogPost } from '../../../lib/blog'
 
-async function getPublishedPostForCategoryPath(categorySlug: BlogCategorySlug, cleanSlug: string) {
-  const lookupSlugs = Array.from(new Set([
-    resolveCurrentSlugForCategoryPath(categorySlug, cleanSlug),
-    cleanSlug,
-  ]))
+export async function generateBlogArticleStaticParams(categorySlug: BlogCategorySlug) {
+  const posts = await getPublishedPostSummaries()
 
-  for (const lookupSlug of lookupSlugs) {
-    const { data: post } = await supabase
-      .from('blog_posts')
-      .select('*')
-      .eq('slug', lookupSlug)
-      .eq('published', true)
-      .maybeSingle()
-
-    if (post) return post as BlogPost
-  }
-
-  return null
+  return posts
+    .map((post) => getPostRouteInfo(post))
+    .filter((route) => route.categorySlug === categorySlug)
+    .map((route) => ({ slug: route.cleanSlug }))
 }
 
 export async function generateBlogArticleMetadata(
@@ -68,7 +57,9 @@ export default async function BlogArticlePage({ categorySlug, cleanSlug }: BlogA
   const post = await getPublishedPostForCategoryPath(categorySlug, cleanSlug)
   const canonical = `https://www.clipa.studio/blog/${categorySlug}/${cleanSlug}`
 
-  const articleJsonLd = post ? {
+  if (!post) notFound()
+
+  const articleJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: post.title,
@@ -94,16 +85,14 @@ export default async function BlogArticlePage({ categorySlug, cleanSlug }: BlogA
       '@type': 'WebPage',
       '@id': canonical,
     },
-  } : null
+  }
 
   return (
     <>
-      {articleJsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
-        />
-      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       <BlogDetailClient
         initialPost={post}
         backHref={`/blog/${categorySlug}`}

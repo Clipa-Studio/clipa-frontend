@@ -13,6 +13,7 @@ import {
   getBlogPostHref,
   type BlogCategorySlug,
 } from '../../../lib/blogCategories'
+import { revalidatePublicContent } from '../../../lib/revalidateContent'
 import { uploadBlogImage, uploadBlogVideo } from '../../../lib/storage'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -148,6 +149,11 @@ export default function BlogEditorClient() {
         published,
         published_at: published ? new Date().toISOString() : null,
         author_id: user.id,
+      })
+      void revalidatePublicContent({
+        resource: 'blog',
+        slug: post.slug,
+        categorySlug,
       })
       router.push(
         post.published

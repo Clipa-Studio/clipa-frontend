@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
-import type { BlogPost } from '../../lib/blog'
+import type { BlogPostSummary } from '../../lib/blog'
 import {
   BLOG_CATEGORIES,
   getBlogCategory,
@@ -22,11 +22,11 @@ function formatDate(dateString: string): string {
   })
 }
 
-function getPostHref(post: BlogPost): string {
+function getPostHref(post: BlogPostSummary): string {
   return getBlogPostHref(post)
 }
 
-function HeroCard({ post }: { post: BlogPost }) {
+function HeroCard({ post }: { post: BlogPostSummary }) {
   return (
     <Link
       href={getPostHref(post)}
@@ -67,7 +67,7 @@ function HeroCard({ post }: { post: BlogPost }) {
   )
 }
 
-function PostCard({ post }: { post: BlogPost }) {
+function PostCard({ post }: { post: BlogPostSummary }) {
   return (
     <Link
       href={getPostHref(post)}
@@ -109,7 +109,7 @@ function PostCard({ post }: { post: BlogPost }) {
 }
 
 interface BlogListClientProps {
-  initialPosts: BlogPost[]
+  initialPosts: BlogPostSummary[]
   categorySlug?: BlogCategorySlug
 }
 

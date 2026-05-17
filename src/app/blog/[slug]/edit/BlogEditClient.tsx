@@ -15,6 +15,7 @@ import {
   isBlogCategorySlug,
   type BlogCategorySlug,
 } from '../../../../lib/blogCategories'
+import { revalidatePublicContent } from '../../../../lib/revalidateContent'
 import { uploadBlogImage, uploadBlogVideo } from '../../../../lib/storage'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -213,6 +214,11 @@ export default function BlogEditClient() {
         category_slug: categorySlug,
         published,
         published_at: publishedAt,
+      })
+      void revalidatePublicContent({
+        resource: 'blog',
+        slug: updatedPost.slug,
+        categorySlug,
       })
       router.push(
         published

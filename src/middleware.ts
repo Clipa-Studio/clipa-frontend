@@ -24,6 +24,10 @@ function isAdminAuthCallback(pathname: string): boolean {
   return pathname === '/auth/callback'
 }
 
+function isAdminApiPath(pathname: string): boolean {
+  return pathname === '/api/admin/revalidate-content'
+}
+
 function notFound() {
   return new NextResponse(null, { status: 404 })
 }
@@ -37,7 +41,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (hostname === ADMIN_HOST) {
-    return isAdminPath(pathname) || isAdminAuthCallback(pathname)
+    return isAdminPath(pathname) || isAdminAuthCallback(pathname) || isAdminApiPath(pathname)
       ? NextResponse.next()
       : notFound()
   }

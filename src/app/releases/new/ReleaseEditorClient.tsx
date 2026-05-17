@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import Header from '../../../components/Header'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useAdmin } from '../../../hooks/useAdmin'
+import { revalidatePublicContent } from '../../../lib/revalidateContent'
 import { createRelease, generateReleaseSlug } from '../../../lib/releases'
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
@@ -71,6 +72,10 @@ export default function ReleaseEditorClient() {
         published,
         published_at: published ? new Date().toISOString() : null,
         author_id: user.id,
+      })
+      void revalidatePublicContent({
+        resource: 'releases',
+        slug: release.slug,
       })
       router.push(
         release.published

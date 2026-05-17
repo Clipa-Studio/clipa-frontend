@@ -142,11 +142,13 @@ export function getBlogPostHref(post: Pick<BlogPost, 'slug'> & { category_slug?:
   return `/blog/${route.categorySlug}/${route.cleanSlug}`
 }
 
-export function getPostsForBlogCategory(posts: BlogPost[], categorySlug: BlogCategorySlug) {
+export function getPostsForBlogCategory<T extends Pick<BlogPost, 'slug'> & { category_slug?: string | null }>(
+  posts: T[],
+  categorySlug: BlogCategorySlug,
+) {
   return posts.filter((post) => getPostRouteInfo(post).categorySlug === categorySlug)
 }
 
 export function resolveCurrentSlugForCategoryPath(categorySlug: BlogCategorySlug, cleanSlug: string) {
   return ROUTE_BY_CATEGORY_PATH.get(`${categorySlug}/${cleanSlug}`)?.currentSlug ?? cleanSlug
 }
-

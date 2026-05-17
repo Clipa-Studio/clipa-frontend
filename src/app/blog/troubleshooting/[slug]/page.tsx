@@ -1,10 +1,16 @@
 import type { Metadata } from 'next'
-import BlogArticlePage, { generateBlogArticleMetadata } from '../../_components/BlogArticlePage'
+import BlogArticlePage, { generateBlogArticleMetadata, generateBlogArticleStaticParams } from '../../_components/BlogArticlePage'
+
+export const revalidate = 60
 
 const categorySlug = 'troubleshooting'
 
 interface Props {
   params: Promise<{ slug: string }>
+}
+
+export async function generateStaticParams() {
+  return generateBlogArticleStaticParams(categorySlug)
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -16,4 +22,3 @@ export default async function TroubleshootingBlogArticlePage({ params }: Props) 
   const { slug } = await params
   return <BlogArticlePage categorySlug={categorySlug} cleanSlug={slug} />
 }
-

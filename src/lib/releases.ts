@@ -13,6 +13,17 @@ export interface Release {
   updated_at: string;
 }
 
+export type ReleaseSummary = Pick<
+  Release,
+  | 'id'
+  | 'version'
+  | 'slug'
+  | 'title'
+  | 'published'
+  | 'published_at'
+  | 'updated_at'
+>;
+
 export function generateReleaseSlug(version: string): string {
   const base = version
     .toLowerCase()

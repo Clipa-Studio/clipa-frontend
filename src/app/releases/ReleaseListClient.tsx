@@ -1,11 +1,11 @@
-'use client'
-
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
-import type { Release } from '../../lib/releases'
+import type { Release, ReleaseSummary } from '../../lib/releases'
+
+type ReleaseListEntry = Release | ReleaseSummary
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -15,7 +15,7 @@ function formatDate(dateString: string): string {
   })
 }
 
-function ReleaseMeta({ release, isLatest }: { release: Release; isLatest?: boolean }) {
+function ReleaseMeta({ release, isLatest }: { release: ReleaseListEntry; isLatest?: boolean }) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       {release.published_at && (
@@ -37,7 +37,9 @@ function ReleaseMeta({ release, isLatest }: { release: Release; isLatest?: boole
   )
 }
 
-function LatestRelease({ release }: { release: Release }) {
+function LatestRelease({ release }: { release: ReleaseListEntry }) {
+  const content = 'content' in release ? release.content : null
+
   return (
     <section className="glass-card-static !rounded-2xl p-6 md:p-8">
       <div className="mb-5">
@@ -53,9 +55,11 @@ function LatestRelease({ release }: { release: Release }) {
         </p>
       </Link>
 
-      <article className="blog-prose mt-8">
-        <ReactMarkdown rehypePlugins={[rehypeRaw]}>{release.content}</ReactMarkdown>
-      </article>
+      {content && (
+        <article className="blog-prose mt-8">
+          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
+        </article>
+      )}
 
       <div className="flex flex-wrap items-center gap-4 mt-8 pt-6 border-t border-white/10">
         <Link
@@ -69,7 +73,7 @@ function LatestRelease({ release }: { release: Release }) {
   )
 }
 
-function ReleaseListItem({ release }: { release: Release }) {
+function ReleaseListItem({ release }: { release: ReleaseSummary }) {
   return (
     <div className="group flex items-center gap-4 px-5 py-4 hover:bg-white/[0.03] transition-colors">
       <Link href={`/releases/${release.slug}`} className="group min-w-0 flex-1">
@@ -107,13 +111,16 @@ function ReleaseListItem({ release }: { release: Release }) {
 }
 
 interface ReleaseListClientProps {
-  initialReleases: Release[]
+  initialReleases: ReleaseSummary[]
+  latestRelease: Release | null
 }
 
-export default function ReleaseListClient({ initialReleases }: ReleaseListClientProps) {
+export default function ReleaseListClient({ initialReleases, latestRelease }: ReleaseListClientProps) {
   const releases = initialReleases
-  const latestRelease = releases[0]
-  const previousReleases = releases.slice(1)
+  const visibleLatestRelease: ReleaseListEntry | undefined = latestRelease ?? releases[0]
+  const previousReleases = visibleLatestRelease
+    ? releases.filter((release) => release.id !== visibleLatestRelease.id)
+    : releases
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0C0C14]">
@@ -141,10 +148,10 @@ export default function ReleaseListClient({ initialReleases }: ReleaseListClient
             </svg>
             <p className="text-white/50 text-sm">No releases yet.</p>
           </div>
-        ) : latestRelease ? (
+        ) : visibleLatestRelease ? (
           <div className="space-y-12">
             <div className="animate-on-load">
-              <LatestRelease release={latestRelease} />
+              <LatestRelease release={visibleLatestRelease} />
             </div>
 
             {previousReleases.length > 0 && (

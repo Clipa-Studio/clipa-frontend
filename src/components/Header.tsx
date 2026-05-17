@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, type FocusEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FocusEvent } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { analytics } from "../lib/analytics";
@@ -20,6 +20,24 @@ export default function Header() {
   const blogCloseTimer = useRef<number | null>(null);
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '';
+  const prefetchedRoutes = useRef<Set<string>>(new Set());
+
+  const prefetchRoute = useCallback((href: string) => {
+    if (prefetchedRoutes.current.has(href)) return;
+    prefetchedRoutes.current.add(href);
+    router.prefetch(href);
+  }, [router]);
+
+  const prefetchPrimaryContentRoutes = useCallback(() => {
+    prefetchRoute('/blog/overview');
+    prefetchRoute('/releases');
+  }, [prefetchRoute]);
+
+  const prefetchBlogRoutes = useCallback(() => {
+    for (const category of BLOG_CATEGORIES) {
+      prefetchRoute(`/blog/${category.slug}`);
+    }
+  }, [prefetchRoute]);
 
   const clearBlogCloseTimer = () => {
     if (blogCloseTimer.current) {
@@ -30,6 +48,7 @@ export default function Header() {
 
   const openBlogMenu = () => {
     clearBlogCloseTimer();
+    prefetchBlogRoutes();
     setBlogMenuOpen(true);
   };
 
@@ -83,6 +102,22 @@ export default function Header() {
   useEffect(() => {
     return () => clearBlogCloseTimer();
   }, []);
+
+  useEffect(() => {
+    const runPrefetch = () => prefetchPrimaryContentRoutes();
+    const idleWindow = window as Window & typeof globalThis & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const idleId = idleWindow.requestIdleCallback(runPrefetch, { timeout: 2500 });
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(runPrefetch, 1200);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [prefetchPrimaryContentRoutes]);
 
   const navLinks = [
     { name: "Changelog", href: "/releases" },
@@ -161,7 +196,10 @@ export default function Header() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    onMouseEnter={closeBlogMenus}
+                    onMouseEnter={() => {
+                      if (link.href === '/releases') prefetchRoute('/releases');
+                      closeBlogMenus();
+                    }}
                     onClick={() => {
                       closeBlogMenus();
                       analytics.navClick(link.name);
@@ -326,7 +364,10 @@ export default function Header() {
               <div className="border-b border-white/[0.08] pb-2">
                 <button
                   type="button"
-                  onClick={() => setMobileBlogOpen(!mobileBlogOpen)}
+                  onClick={() => {
+                    prefetchBlogRoutes();
+                    setMobileBlogOpen(!mobileBlogOpen);
+                  }}
                   className="flex w-full items-center justify-between py-2 text-left text-lg font-medium text-gray-200"
                   aria-expanded={mobileBlogOpen}
                 >
@@ -357,6 +398,7 @@ export default function Header() {
               </div>
               <Link
                 href="/releases"
+                onMouseEnter={() => prefetchRoute('/releases')}
                 onClick={() => {
                   closeBlogMenus();
                   setMobileMenuOpen(false);

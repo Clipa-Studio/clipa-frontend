@@ -1,22 +1,23 @@
 import type { Metadata } from 'next'
 import { notFound, permanentRedirect } from 'next/navigation'
-import { supabase } from '../../../lib/supabase'
-import type { BlogPost } from '../../../lib/blog'
+import { getPublishedPostBySlug, getPublishedPostSummaries } from '../../../lib/publicContent'
 import { getBlogPostHref } from '../../../lib/blogCategories'
+
+export const revalidate = 60
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
+export async function generateStaticParams() {
+  const posts = await getPublishedPostSummaries()
+  return posts.map((post) => ({ slug: post.slug }))
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
 
-  const { data: post } = await supabase
-    .from('blog_posts')
-    .select('title, excerpt, cover_image_url, slug, category_slug')
-    .eq('slug', slug)
-    .eq('published', true)
-    .single()
+  const post = await getPublishedPostBySlug(slug)
 
   if (!post) {
     return {
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
-  const canonical = getBlogPostHref(post as BlogPost)
+  const canonical = getBlogPostHref(post)
 
   return {
     title: post.title,
@@ -47,14 +48,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BlogDetailPage({ params }: Props) {
   const { slug } = await params
 
-  const { data: post } = await supabase
-    .from('blog_posts')
-    .select('*')
-    .eq('slug', slug)
-    .eq('published', true)
-    .maybeSingle()
+  const post = await getPublishedPostBySlug(slug)
 
   if (!post) notFound()
 
-  permanentRedirect(getBlogPostHref(post as BlogPost))
+  permanentRedirect(getBlogPostHref(post))
 }

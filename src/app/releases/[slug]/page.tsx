@@ -1,21 +1,23 @@
 import type { Metadata } from 'next'
-import { supabase } from '../../../lib/supabase'
-import type { Release } from '../../../lib/releases'
+import { notFound } from 'next/navigation'
+import { getPublishedReleaseBySlug, getPublishedReleaseSummaries } from '../../../lib/publicContent'
 import ReleaseDetailClient from './ReleaseDetailClient'
+
+export const revalidate = 60
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
+export async function generateStaticParams() {
+  const releases = await getPublishedReleaseSummaries()
+  return releases.map((release) => ({ slug: release.slug }))
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
 
-  const { data: release } = await supabase
-    .from('releases')
-    .select('version, title')
-    .eq('slug', slug)
-    .eq('published', true)
-    .maybeSingle()
+  const release = await getPublishedReleaseBySlug(slug)
 
   if (!release) {
     return {
@@ -47,12 +49,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ReleaseDetailPage({ params }: Props) {
   const { slug } = await params
 
-  const { data: release } = await supabase
-    .from('releases')
-    .select('*')
-    .eq('slug', slug)
-    .eq('published', true)
-    .maybeSingle()
+  const release = await getPublishedReleaseBySlug(slug)
+  if (!release) notFound()
 
-  return <ReleaseDetailClient initialRelease={release as Release | null} />
+  return <ReleaseDetailClient initialRelease={release} />
 }
