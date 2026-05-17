@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import type { Release } from '../../../lib/releases'
+import { markdownSanitizeSchema } from '../../../lib/markdownSanitize'
 
 interface ReleaseDetailClientProps {
   initialRelease: Release | null
@@ -72,7 +74,9 @@ export default function ReleaseDetailClient({ initialRelease }: ReleaseDetailCli
         <p className="text-lg text-white/50 mb-10 leading-relaxed">{release.title}</p>
 
         <article className="blog-prose">
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{release.content}</ReactMarkdown>
+          <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}>
+            {release.content}
+          </ReactMarkdown>
         </article>
 
       </main>

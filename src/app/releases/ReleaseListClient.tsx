@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import Header from '../../components/Header'
 import Footer from '../../components/Footer'
 import type { Release, ReleaseSummary } from '../../lib/releases'
+import { markdownSanitizeSchema } from '../../lib/markdownSanitize'
 
 type ReleaseListEntry = Release | ReleaseSummary
 
@@ -57,7 +59,9 @@ function LatestRelease({ release }: { release: ReleaseListEntry }) {
 
       {content && (
         <article className="blog-prose mt-8">
-          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
+          <ReactMarkdown rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}>
+            {content}
+          </ReactMarkdown>
         </article>
       )}
 

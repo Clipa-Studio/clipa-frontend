@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import remarkGfm from 'remark-gfm'
 import Header from '../../../components/Header'
 import Footer from '../../../components/Footer'
 import type { BlogPost } from '../../../lib/blog'
+import { markdownSanitizeSchema } from '../../../lib/markdownSanitize'
 
 interface BlogDetailClientProps {
   initialPost: BlogPost | null
@@ -89,7 +91,10 @@ export default function BlogDetailClient({
         )}
 
         <article className="blog-prose">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw, [rehypeSanitize, markdownSanitizeSchema]]}
+          >
             {post.content}
           </ReactMarkdown>
         </article>
