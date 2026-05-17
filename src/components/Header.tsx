@@ -18,6 +18,7 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [blogMenuOpen, setBlogMenuOpen] = useState(false);
   const blogCloseTimer = useRef<number | null>(null);
+  const profileCloseTimer = useRef<number | null>(null);
 
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '';
   const prefetchedRoutes = useRef<Set<string>>(new Set());
@@ -46,15 +47,28 @@ export default function Header() {
     }
   };
 
-  const openBlogMenu = () => {
-    clearBlogCloseTimer();
-    prefetchBlogRoutes();
-    setBlogMenuOpen(true);
-  };
-
   const closeBlogMenu = () => {
     clearBlogCloseTimer();
     setBlogMenuOpen(false);
+  };
+
+  const clearProfileCloseTimer = () => {
+    if (profileCloseTimer.current) {
+      window.clearTimeout(profileCloseTimer.current);
+      profileCloseTimer.current = null;
+    }
+  };
+
+  const closeProfileMenu = () => {
+    clearProfileCloseTimer();
+    setDropdownOpen(false);
+  };
+
+  const openBlogMenu = () => {
+    clearBlogCloseTimer();
+    closeProfileMenu();
+    prefetchBlogRoutes();
+    setBlogMenuOpen(true);
   };
 
   const scheduleBlogMenuClose = () => {
@@ -65,8 +79,22 @@ export default function Header() {
     }, 120);
   };
 
+  const openProfileMenu = () => {
+    clearProfileCloseTimer();
+    closeBlogMenu();
+    setDropdownOpen(true);
+  };
+
+  const scheduleProfileMenuClose = () => {
+    clearProfileCloseTimer();
+    profileCloseTimer.current = window.setTimeout(() => {
+      setDropdownOpen(false);
+      profileCloseTimer.current = null;
+    }, 120);
+  };
+
   const handleLogout = async () => {
-    setDropdownOpen(false);
+    closeProfileMenu();
     await signOut();
     router.push('/');
   };
@@ -79,6 +107,12 @@ export default function Header() {
   const handleBlogBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       closeBlogMenu();
+    }
+  };
+
+  const handleProfileBlur = (event: FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      closeProfileMenu();
     }
   };
 
@@ -100,7 +134,10 @@ export default function Header() {
   }, [dropdownOpen]);
 
   useEffect(() => {
-    return () => clearBlogCloseTimer();
+    return () => {
+      clearBlogCloseTimer();
+      clearProfileCloseTimer();
+    };
   }, []);
 
   useEffect(() => {
@@ -217,42 +254,61 @@ export default function Header() {
             {!loading && (
               <>
                 {user ? (
-                  <div className="relative">
+                  <div
+                    className="relative"
+                    onMouseEnter={openProfileMenu}
+                    onMouseLeave={scheduleProfileMenuClose}
+                    onFocus={openProfileMenu}
+                    onBlur={handleProfileBlur}
+                  >
                     <button
-                      onClick={() => setDropdownOpen(!dropdownOpen)}
-                      className="flex items-center gap-2 text-[16px] font-medium transition-colors text-gray-300 hover:text-white"
+                      type="button"
+                      onClick={openProfileMenu}
+                      className="-mx-2 -my-1 flex items-center gap-2 rounded-lg px-2 py-1 text-[16px] font-medium text-gray-300 outline-none transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+                      aria-expanded={dropdownOpen}
                     >
                       {displayName}
                       <svg className={`w-4 h-4 transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''} text-gray-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    {dropdownOpen && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                        <div className="absolute right-0 mt-3 w-48 bg-[#1C1C28] rounded-xl border border-white/10 shadow-xl z-50 overflow-hidden p-1">
-                          <Link
-                            href="/mypage"
-                            onClick={() => setDropdownOpen(false)}
-                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
-                          >
-                            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            My Page
-                          </Link>
-                          <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-white/60 hover:bg-white/5 hover:text-white rounded-lg transition-colors w-full"
-                          >
-                            <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            Sign Out
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <div
+                      className={`absolute right-0 top-full z-50 mt-4 w-56 overflow-hidden rounded-xl border border-white/[0.08] bg-[#0C0C14]/90 shadow-2xl shadow-black/30 backdrop-blur-xl transition-[max-height,opacity,transform] duration-300 ease-out ${
+                        dropdownOpen
+                          ? 'max-h-56 translate-y-0 opacity-100 pointer-events-auto'
+                          : 'max-h-0 -translate-y-3 opacity-0 pointer-events-none'
+                      }`}
+                      onMouseEnter={openProfileMenu}
+                      onMouseLeave={scheduleProfileMenuClose}
+                    >
+                      <div
+                        className={`p-1.5 transition-transform duration-300 ease-out ${
+                          dropdownOpen ? 'translate-y-0' : '-translate-y-4'
+                        }`}
+                      >
+                        <Link
+                          href="/mypage"
+                          onClick={closeProfileMenu}
+                          className="group flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white"
+                          tabIndex={dropdownOpen ? 0 : -1}
+                        >
+                          <svg className="h-4 w-4 text-white/40 transition-colors group-hover:text-primary-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z" />
+                          </svg>
+                          My Page
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="group flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white"
+                          tabIndex={dropdownOpen ? 0 : -1}
+                        >
+                          <svg className="h-4 w-4 text-white/40 transition-colors group-hover:text-primary-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
+                          </svg>
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <Link
