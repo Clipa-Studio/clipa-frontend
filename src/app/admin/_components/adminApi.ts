@@ -181,9 +181,35 @@ function throwIfError(error: { message?: string } | null | undefined, fallback: 
   if (error) throw new Error(error.message || fallback)
 }
 
-function eventDateLowerBound(sinceDays: number | null) {
-  if (!Number.isFinite(sinceDays)) return null
-  return new Date(Date.now() - Number(sinceDays) * 24 * 60 * 60 * 1000).toISOString()
+async function callAdminRpcApi<T>(
+  resource: 'dashboard' | 'events' | 'eventAnalytics',
+  params: Record<string, string | number | null | undefined> = {},
+): Promise<T> {
+  const session = await ensureSession()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase 설정을 찾을 수 없습니다.')
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/admin-rpc`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: supabaseAnonKey,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+    body: JSON.stringify({ resource, params }),
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({})) as { error?: string }
+    throw new Error(payload.error || '관리자 API 요청에 실패했습니다.')
+  }
+
+  return response.json() as Promise<T>
 }
 
 async function ensureSession() {
@@ -291,47 +317,8 @@ async function getContent(table: 'blog_posts' | 'releases') {
 }
 
 async function getEvents(params: Record<string, string | number | null | undefined>) {
-  const eventName = typeof params.eventName === 'string' ? params.eventName : ''
-  const environment = typeof params.environment === 'string' ? params.environment : ''
-  const clientInstallId = typeof params.clientInstallId === 'string' ? params.clientInstallId.trim() : ''
-  const since = typeof params.since === 'string' ? params.since : ''
-  const cursorReceivedAt = typeof params.cursorReceivedAt === 'string' && params.cursorReceivedAt.length > 0
-    ? params.cursorReceivedAt
-    : null
-  const cursorEventId = typeof params.cursorEventId === 'string' && params.cursorEventId.length > 0
-    ? params.cursorEventId
-    : null
+  const response = await callAdminRpcApi<Partial<AdminEventsResponse> | null>('events', params)
   const limit = Math.max(10, Math.min(Number(params.limit || 50), 100))
-  const sinceDays = since && since !== 'all' ? Number(since) : null
-
-  const rpcParams = {
-    p_event_name: eventName || null,
-    p_environment: environment || null,
-    p_since_days: Number.isFinite(sinceDays) ? sinceDays : null,
-    p_cursor_received_at: cursorReceivedAt,
-    p_cursor_event_id: cursorEventId,
-    p_limit: limit,
-  }
-
-  const { data, error } = await supabase.rpc('admin_get_events', clientInstallId
-    ? { ...rpcParams, p_client_install_id: clientInstallId }
-    : rpcParams)
-
-  if (error && clientInstallId) {
-    return getEventsByClient({
-      clientInstallId,
-      eventName,
-      environment,
-      sinceDays: Number.isFinite(sinceDays) ? sinceDays : null,
-      cursorReceivedAt,
-      cursorEventId,
-      limit,
-    })
-  }
-
-  throwIfError(error, '이벤트 로그를 불러오지 못했습니다.')
-
-  const response = data as Partial<AdminEventsResponse> | null
 
   return {
     events: (response?.events ?? []) as AdminEventRow[],
@@ -342,83 +329,16 @@ async function getEvents(params: Record<string, string | number | null | undefin
   }
 }
 
-async function getEventsByClient({
-  clientInstallId,
-  eventName,
-  environment,
-  sinceDays,
-  cursorReceivedAt,
-  cursorEventId,
-  limit,
-}: {
-  clientInstallId: string
-  eventName: string
-  environment: string
-  sinceDays: number | null
-  cursorReceivedAt: string | null
-  cursorEventId: string | null
-  limit: number
-}) {
-  const sinceLowerBound = eventDateLowerBound(sinceDays)
-  let query = supabase
-    .from('client_events')
-    .select('event_id, client_install_id, event_name, occurred_at, received_at, app_version, app_build, os_version, environment, attributes')
-    .eq('client_install_id', clientInstallId)
-    .order('received_at', { ascending: false })
-    .order('event_id', { ascending: false })
-    .limit(limit + 1)
-
-  if (eventName) query = query.eq('event_name', eventName)
-  if (environment) query = query.eq('environment', environment)
-  if (sinceLowerBound) query = query.gte('received_at', sinceLowerBound)
-  if (cursorReceivedAt && cursorEventId) {
-    query = query.or(`received_at.lt.${cursorReceivedAt},and(received_at.eq.${cursorReceivedAt},event_id.lt.${cursorEventId})`)
-  }
-
-  const { data, error } = await query
-  throwIfError(error, '이벤트 로그를 불러오지 못했습니다.')
-
-  let namesQuery = supabase
-    .from('client_events')
-    .select('event_name')
-    .eq('client_install_id', clientInstallId)
-    .order('event_name', { ascending: true })
-    .limit(1000)
-
-  if (environment) namesQuery = namesQuery.eq('environment', environment)
-  if (sinceLowerBound) namesQuery = namesQuery.gte('received_at', sinceLowerBound)
-
-  const { data: eventNameRows, error: eventNamesError } = await namesQuery
-  throwIfError(eventNamesError, '이벤트 이름 목록을 불러오지 못했습니다.')
-
-  const rows = ((data ?? []) as AdminEventRow[])
-  const events = rows.slice(0, limit)
-  const extraRow = rows[limit]
-
-  return {
-    events,
-    eventNames: Array.from(new Set(((eventNameRows ?? []) as Array<{ event_name: string | null }>).map((row) => row.event_name).filter(Boolean))) as string[],
-    hasNextPage: rows.length > limit,
-    nextCursor: extraRow ? { receivedAt: extraRow.received_at, eventId: extraRow.event_id } : null,
-    limit,
-  }
-}
-
 async function getEventAnalytics(params: Record<string, string | number | null | undefined>) {
-  const environment = typeof params.environment === 'string' ? params.environment : 'prod'
-  const since = typeof params.since === 'string' ? params.since : '7'
-  const sinceDays = since && since !== 'all' ? Number(since) : null
-
-  const { data, error } = await supabase.rpc('admin_get_event_analytics', {
-    p_environment: environment || 'prod',
-    p_since_days: Number.isFinite(sinceDays) ? sinceDays : null,
-    p_timezone: getAdminTimezone(),
+  const response = await callAdminRpcApi<Partial<AdminEventAnalyticsResponse> | null>('eventAnalytics', {
+    ...params,
+    timezone: getAdminTimezone(),
   })
 
-  throwIfError(error, '이벤트 분석을 불러오지 못했습니다.')
+  return normalizeEventAnalyticsResponse(response)
+}
 
-  const response = data as Partial<AdminEventAnalyticsResponse> | null
-
+function normalizeEventAnalyticsResponse(response: Partial<AdminEventAnalyticsResponse> | null) {
   return {
     summary: {
       totalEvents: response?.summary?.totalEvents ?? 0,
@@ -441,18 +361,17 @@ async function getEventAnalytics(params: Record<string, string | number | null |
 }
 
 async function getDashboard() {
-  const { data, error } = await supabase.rpc('admin_get_dashboard', {
-    p_timezone: getAdminTimezone(),
-    p_recent_limit: 8,
+  const response = await callAdminRpcApi<AdminDashboardData>('dashboard', {
+    timezone: getAdminTimezone(),
   })
 
-  throwIfError(error, '대시보드를 불러오지 못했습니다.')
+  return normalizeDashboardResponse(response)
+}
 
-  if (!data || typeof data !== 'object') {
+function normalizeDashboardResponse(dashboard: AdminDashboardData) {
+  if (!dashboard || typeof dashboard !== 'object') {
     throw new Error('대시보드를 불러오지 못했습니다.')
   }
-
-  const dashboard = data as AdminDashboardData
 
   return {
     ...dashboard,

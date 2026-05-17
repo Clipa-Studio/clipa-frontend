@@ -29,3 +29,4 @@ tsconfig.tsbuildinfo
 .env*.local
 dist
 public/videos/presets/backup/
+supabase/.temp
